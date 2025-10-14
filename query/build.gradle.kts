@@ -43,3 +43,16 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }
+
+tasks.register("runQueryUnitTests") {
+    group = "verification"
+    description = "Ejecuta solo los tests unitarios del módulo query"
+
+    dependsOn("testDebugUnitTest")
+
+    doLast {
+        println("✅ Tests unitarios del módulo query completados")
+    }
+}
+
+
