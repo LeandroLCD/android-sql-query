@@ -90,6 +90,45 @@ class QueryDelete private constructor(
             operations[key] = LogicalOperation(LogicalType.AND, operator)
             return this
         }
+        /**
+         * Adds an AND condition to the WHERE clause.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun and(operator: SQLOperator<*>): QueryBuilder {
+            operations[operator.column] = LogicalOperation(LogicalType.AND, operator)
+            return this
+        }
+
+        /**
+         * Adds an AND NOT logical operation to the query.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun andNot(operator: SQLOperator<*>): QueryBuilder {
+            operations[operator.column] = LogicalOperation(LogicalType.AND_NOT, operator)
+            return this
+        }
+
+        /**
+         * Adds an EXISTS logical operation to the query.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun exists(operator: SQLOperator<*>): QueryBuilder {
+            operations[operator.column] = LogicalOperation(LogicalType.EXISTS, operator)
+            return this
+        }
+
+        /**
+         * Adds a NOT logical operation to the query.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun not(operator: SQLOperator<*>): QueryBuilder {
+            operations[operator.column] = LogicalOperation(LogicalType.NOT, operator)
+            return this
+        }
 
         /**
          * Adds an OR condition to the WHERE clause.
