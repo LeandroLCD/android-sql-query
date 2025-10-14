@@ -1,0 +1,45 @@
+package com.blipblipcode.query.utils
+
+import androidx.sqlite.db.SimpleSQLiteQuery
+import androidx.sqlite.db.SupportSQLiteQuery
+import com.blipblipcode.query.InnerJoint
+import com.blipblipcode.query.QuerySelect
+import com.blipblipcode.query.Queryable
+
+/**
+ * Creates an `InnerJoint` by joining this `QuerySelect` with another one.
+ * This is a convenience function to start an INNER JOIN chain.
+ *
+ * @param other The `QuerySelect` to join with.
+ * @param onClause The ON clause for the join.
+ * @return A new `InnerJoint` instance.
+ */
+fun QuerySelect.innerJoin(other: QuerySelect, onClause: String): InnerJoint {
+    return InnerJoint.builder(this)
+        .addJoin(other, onClause)
+        .build()
+}
+
+/**
+ * Adds another join to an existing `InnerJoint`.
+ * This allows for chaining multiple INNER JOINs together.
+ *
+ * @param query The `QuerySelect` to add to the join.
+ * @param onClause The ON clause for this new join.
+ * @return A new `InnerJoint` instance containing the new join.
+ */
+fun InnerJoint.join(query: QuerySelect, onClause: String): InnerJoint {
+    return InnerJoint.builder(this.queries.first())
+        .addJoins(this.queries.drop(1), onClauses)
+        .addJoin(query, onClause)
+        .build()
+}
+
+/**
+ * Converts any `Queryable` object into a `SupportSQLiteQuery` that can be used with Android's Room persistence library.
+ *
+ * @return A `SupportSQLiteQuery` instance representing the query.
+ */
+fun Queryable.asSQLiteQuery(): SupportSQLiteQuery {
+    return SimpleSQLiteQuery(this.asSql())
+}
