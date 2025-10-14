@@ -26,7 +26,7 @@ class UnionQuery private constructor(
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
         
         return buildString {
-            append(queries.joinToString("\n$unionKeyword\n") { "${it.asSql()}" })
+            append(queries.joinToString("\n$unionKeyword\n") { it.asSql() })
             if (orderBy != null) {
                 appendLine()
                 append(orderBy!!.asString())
