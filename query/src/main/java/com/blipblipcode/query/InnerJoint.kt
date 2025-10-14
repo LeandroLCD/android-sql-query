@@ -28,11 +28,11 @@ class InnerJoint private constructor(
 
         val baseQuery = queries.first()
         val joins = queries.drop(1).zip(onClauses.drop(1)) { query, onClause ->
-            "INNER JOIN (${query.asSql()}) ON $onClause"
+            "\nINNER JOIN \n${query.asSql()} \nON $onClause"
         }
 
         return buildString {
-            append("(${baseQuery.asSql()}) ${joins.joinToString(" ")}")
+            append("${baseQuery.asSql()} ${joins.joinToString(" ")}")
             if (orderBy != null) {
                 appendLine()
                 append(orderBy!!.asString())
@@ -44,7 +44,7 @@ class InnerJoint private constructor(
      * Appends an ORDER BY clause to the entire UNION query.
      * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
      *
-     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @param operator A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
      * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
      */
     fun orderBy(operator: OrderBy): Queryable {
