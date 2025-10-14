@@ -7,7 +7,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-API%2021+-green.svg?style=flat&logo=android)](https://developer.android.com)
 [![Room](https://img.shields.io/badge/Room-Compatible-blue.svg?style=flat)](https://developer.android.com/training/data-storage/room)
-[![JitPack](https://jitpack.io/v/blipblipcode/androidsqlquery.svg)](https://jitpack.io/#blipblipcode/androidsqlquery)
+[![Run Query Unit Tests](https://github.com/LeandroLCD/android-sql-query/actions/workflows/run-query-tests.yml/badge.svg)](https://github.com/LeandroLCD/android-sql-query/actions/workflows/run-query-tests.yml)
 
 
 Diseñada para integrarse perfectamente con la base de datos de Android y Room a través de `@RawQuery`, permitiendo la creación de consultas dinámicas de manera segura y legible.
