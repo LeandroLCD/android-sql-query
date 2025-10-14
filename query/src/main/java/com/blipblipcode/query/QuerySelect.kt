@@ -2,6 +2,7 @@ package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
+import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 
 /**
@@ -20,6 +21,7 @@ class QuerySelect private constructor(
     private val operations: LinkedHashMap<String, LogicalOperation>,
     private val fields: List<String>
 ) : Queryable {
+    private var orderBy: OrderBy? = null
 
     companion object {
         /**
@@ -87,8 +89,27 @@ class QuerySelect private constructor(
     override fun asSql(): String {
         val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
         val operationsStr = if (operations.isNotEmpty()) operations.values.joinToString(" ") { it.asString() } else ""
-        return "SELECT $fieldStr FROM $table WHERE ${where.toSQLString()} $operationsStr".trim()
+        return buildString {
+            append("SELECT $fieldStr FROM $table WHERE ${where.toSQLString()} $operationsStr".trim())
+            if (orderBy != null) {
+                appendLine()
+                append(orderBy!!.asString())
+            }
+        }
     }
+
+    /**
+     * Appends an ORDER BY clause to the entire UNION query.
+     * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
+     *
+     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
+     */
+    fun orderBy(operator: OrderBy): Queryable {
+        orderBy = operator
+        return this
+    }
+
 
     /**
      * A builder for creating `QuerySelect` instances.

@@ -1,5 +1,7 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.operator.OrderBy
+
 /**
  * Represents a SQL INNER JOIN query construct.
  * This class is designed to build complex INNER JOIN statements by combining multiple `QuerySelect` objects.
@@ -13,6 +15,7 @@ class InnerJoint private constructor(
     val onClauses: List<String>
 ) : Queryable {
 
+    private var orderBy: OrderBy? = null
 
     /**
      * Generates the SQL string for the INNER JOIN statement.
@@ -28,7 +31,25 @@ class InnerJoint private constructor(
             "INNER JOIN (${query.asSql()}) ON $onClause"
         }
 
-        return "(${baseQuery.asSql()}) ${joins.joinToString(" ")}"
+        return buildString {
+            append("(${baseQuery.asSql()}) ${joins.joinToString(" ")}")
+            if (orderBy != null) {
+                appendLine()
+                append(orderBy!!.asString())
+            }
+        }
+    }
+
+    /**
+     * Appends an ORDER BY clause to the entire UNION query.
+     * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
+     *
+     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
+     */
+    fun orderBy(operator: OrderBy): Queryable {
+        orderBy = operator
+        return this
     }
 
     /**
@@ -50,6 +71,7 @@ class InnerJoint private constructor(
             onClauses.add(onClause)
             return this
         }
+
         /**
          * Adds multiple queries and their corresponding 'ON' clauses to the join.
          * @param queries The list of `QuerySelect` objects to add.

@@ -1,5 +1,7 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.operator.OrderBy
+
 /**
  * Represents a SQL UNION query construct.
  * This class is designed to build UNION and UNION ALL statements by combining multiple `QuerySelect` objects.
@@ -12,7 +14,7 @@ class UnionQuery private constructor(
     val queries: List<QuerySelect>,
     val useUnionAll: Boolean = false
 ) : Queryable {
-
+    private var orderBy: OrderBy? = null
     /**
      * Generates the SQL string for the UNION statement.
      * @return The complete UNION SQL query as a string.
@@ -23,7 +25,25 @@ class UnionQuery private constructor(
 
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
         
-        return queries.joinToString(" $unionKeyword ") { "(${it.asSql()})" }
+        return buildString {
+            append(queries.joinToString(" $unionKeyword ") { "(${it.asSql()})" })
+            if (orderBy != null) {
+                appendLine()
+                append(orderBy!!.asString())
+            }
+        }
+    }
+
+    /**
+     * Appends an ORDER BY clause to the entire UNION query.
+     * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
+     *
+     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
+     */
+    fun orderBy(operator: OrderBy): Queryable {
+        orderBy = operator
+        return this
     }
 
     /**
