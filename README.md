@@ -72,7 +72,7 @@ allprojects {
 
 ```gradle
 dependencies {
-    implementation 'com.github.blipblipcode:androidsqlquery:0.0.4'
+    implementation 'com.github.blipblipcode:android-sql-query:0.0.4'
 }
 ```
 ---
