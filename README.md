@@ -7,6 +7,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-API%2021+-green.svg?style=flat&logo=android)](https://developer.android.com)
 [![Room](https://img.shields.io/badge/Room-Compatible-blue.svg?style=flat)](https://developer.android.com/training/data-storage/room)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/LeandroLCD/android-sql-query)
 [![Run Query Unit Tests](https://github.com/LeandroLCD/android-sql-query/actions/workflows/run-query-tests.yml/badge.svg)](https://github.com/LeandroLCD/android-sql-query/actions/workflows/run-query-tests.yml)
 
 
@@ -71,7 +72,7 @@ allprojects {
 
 ```gradle
 dependencies {
-    implementation 'com.github.blipblipcode:androidsqlquery:1.0.0'
+    implementation 'com.github.blipblipcode:android-sql-query:0.0.4'
 }
 ```
 ---
