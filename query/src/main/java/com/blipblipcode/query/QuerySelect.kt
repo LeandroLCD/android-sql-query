@@ -1,5 +1,6 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.operator.Limit
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
@@ -22,6 +23,7 @@ class QuerySelect private constructor(
     private val fields: List<String>
 ) : Queryable {
     private var orderBy: OrderBy? = null
+    private var limit: Limit? = null
 
     companion object {
         /**
@@ -79,7 +81,10 @@ class QuerySelect private constructor(
             where = where,
             operations = operations,
             fields = fieldList
-        )
+        ).apply {
+            this.orderBy = this@QuerySelect.orderBy
+            this.limit = this@QuerySelect.limit
+        }
     }
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
@@ -106,8 +111,12 @@ class QuerySelect private constructor(
         return buildString {
             append("SELECT $fieldStr FROM $table WHERE ${where.toSQLString()} $operationsStr".trim())
             if (orderBy != null) {
-                appendLine()
+                append(" ")
                 append(orderBy!!.asString())
+            }
+            if (limit != null) {
+                append(" ")
+                append(limit!!.asString())
             }
         }
     }
@@ -116,11 +125,34 @@ class QuerySelect private constructor(
      * Appends an ORDER BY clause to the entire UNION query.
      * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
      *
-     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @param operator A vararg of `[OrderBy]` objects specifying the columns and direction for sorting.
      * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
      */
     fun orderBy(operator: OrderBy): Queryable {
         orderBy = operator
+        return this
+    }
+
+    /**
+     * Adds a LIMIT clause to the query to limit the number of rows returned.
+     *
+     * @param count The maximum number of rows to return.
+     * @param offset The number of rows to skip before returning results (optional).
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun limit(count: Int, offset: Int? = null): QuerySelect {
+        limit = Limit(count, offset)
+        return this
+    }
+
+    /**
+     * Adds a LIMIT clause to the query using a Limit object.
+     *
+     * @param limitOperator The Limit object specifying the limit parameters.
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun limit(limitOperator: Limit): QuerySelect {
+        limit = limitOperator
         return this
     }
 
@@ -134,7 +166,9 @@ class QuerySelect private constructor(
         private val operations: LinkedHashMap<String, LogicalOperation>
     ) {
         private var where: SQLOperator<*>? = null
-        private var fields: List<String> = listOf("*" )
+        private var fields: List<String> = listOf("*")
+        private var orderBy: OrderBy? = null
+        private var limit: Limit? = null
 
         /**
          * Adds an AND condition to the WHERE clause.
@@ -249,6 +283,37 @@ class QuerySelect private constructor(
         }
 
         /**
+         * Sets the ORDER BY clause for the query.
+         * @param orderBy The OrderBy object specifying the column and direction for sorting.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun orderBy(orderBy: OrderBy): QueryBuilder {
+            this.orderBy = orderBy
+            return this
+        }
+
+        /**
+         * Sets a LIMIT clause for the query to limit the number of rows returned.
+         * @param count The maximum number of rows to return.
+         * @param offset The number of rows to skip before returning results (optional).
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun limit(count: Int, offset: Int? = null): QueryBuilder {
+            this.limit = Limit(count, offset)
+            return this
+        }
+
+        /**
+         * Sets a LIMIT clause for the query using a Limit object.
+         * @param limit The Limit object specifying the limit parameters.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun limit(limit: Limit): QueryBuilder {
+            this.limit = limit
+            return this
+        }
+
+        /**
          * Builds the `QuerySelect` instance.
          * @return A new `QuerySelect` object.
          * @throws IllegalArgumentException if the WHERE clause is not set.
@@ -260,7 +325,10 @@ class QuerySelect private constructor(
                 table = table,
                 operations = LinkedHashMap(operations),
                 fields = fields
-            )
+            ).apply {
+                this@apply.orderBy = this@QueryBuilder.orderBy
+                this@apply.limit = this@QueryBuilder.limit
+            }
         }
     }
 }
