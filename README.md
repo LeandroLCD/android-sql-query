@@ -36,7 +36,6 @@ Diseñada para integrarse perfectamente con la base de datos de Android y Room a
 - [🔗 Integración con Room](#-integración-con-room)
 - [📝 Ejemplos Avanzados](#-ejemplos-avanzados)
 - [🤝 Contribuir](#-contribuir)
-- [📄 Licencia](#-licencia)
 
 ---
 
