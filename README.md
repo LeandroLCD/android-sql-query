@@ -92,6 +92,10 @@ val selectQuery = QuerySelect.builder("users")
     .and("status", SQLOperator.Equals("status", "active"))
     .setFields("name", "email")
     .build()
+// Agrega un límite de 10 resultados
+    selectQuery.limit(10)
+// Agrega un offset 
+    selectQuery.limit(10, 5) 
 
 val sqlString = selectQuery.asSql()
 ```
