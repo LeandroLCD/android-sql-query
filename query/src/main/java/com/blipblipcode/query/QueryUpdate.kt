@@ -74,6 +74,18 @@ class QueryUpdate private constructor(
         return this
     }
 
+    override fun getSqlOperators(): List<SQLOperator<*>> {
+        return emptyList()
+    }
+
+    override fun getTableName(): String {
+        return table
+    }
+
+    override fun getSqlOperation(key: String): SQLOperator<*>? {
+        return null
+    }
+
     /**
      * Generates the SQL string for the UPDATE statement.
      * @return The complete UPDATE SQL query as a string.

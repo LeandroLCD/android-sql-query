@@ -1,6 +1,7 @@
 package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.Field
+import com.blipblipcode.query.operator.SQLOperator
 
 /**
  * Represents a SQL INSERT statement.
@@ -56,6 +57,18 @@ class QueryInsert private constructor(
     fun remove(key: String): QueryInsert {
         fields.remove(key)
         return this
+    }
+
+    override fun getSqlOperators(): List<SQLOperator<*>> {
+        return emptyList()
+    }
+
+    override fun getTableName(): String {
+        return table
+    }
+
+    override fun getSqlOperation(key: String): SQLOperator<*>? {
+        return null
     }
 
     /**

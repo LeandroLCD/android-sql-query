@@ -5,7 +5,6 @@ import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class QuerySelectTest {
@@ -278,5 +277,85 @@ class QuerySelectTest {
 
         assertEquals(querySelect.asSql().trim(), supportSQLiteQuery.sql)
         assertEquals(0, supportSQLiteQuery.argCount)
+    }
+
+    @Test
+    fun `limit results with a single limit value`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with offset`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(5, 10)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 5 OFFSET 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with chaining call`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10)
+            .build()
+        val instance = query.limit(5, 10)
+        assertEquals(query, instance)
+    }
+
+    @Test
+    fun `limit results with various conditions`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10, 5)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 10 OFFSET 5"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with no offset`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10, 0)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with zero limit`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(0)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 0"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with negative limit`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(-5)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT -5"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `limit results with negative offset`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10, -5)
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 10 OFFSET -5"
+        assertEquals(expectedSql, query.asSql().trim())
     }
 }

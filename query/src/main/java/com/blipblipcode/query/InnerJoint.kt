@@ -1,6 +1,7 @@
 package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.OrderBy
+import com.blipblipcode.query.operator.SQLOperator
 
 /**
  * Represents a SQL INNER JOIN query construct.
@@ -16,6 +17,18 @@ class InnerJoint private constructor(
 ) : Queryable {
 
     private var orderBy: OrderBy? = null
+
+    override fun getSqlOperators(): List<SQLOperator<*>> {
+        return queries.flatMap { it.getSqlOperators() }
+    }
+
+    override fun getTableName(): String {
+        return queries.joinToString(", ") { it.getTableName() }
+    }
+
+    override fun getSqlOperation(key: String): SQLOperator<*>? {
+        return queries.flatMap { it.getSqlOperators() }.firstOrNull { it.column.equals(key, ignoreCase = true) }
+    }
 
     /**
      * Generates the SQL string for the INNER JOIN statement.

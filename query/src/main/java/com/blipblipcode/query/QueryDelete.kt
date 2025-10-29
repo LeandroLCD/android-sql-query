@@ -63,6 +63,20 @@ class QueryDelete private constructor(
         return this
     }
 
+    override fun getSqlOperators(): List<SQLOperator<*>> {
+        return operations.values.map {
+            it.operator
+        }
+    }
+
+    override fun getTableName(): String {
+        return table
+    }
+
+    override fun getSqlOperation(key: String): SQLOperator<*>? {
+        return operations[key]?.operator
+    }
+
     /**
      * Generates the SQL string for the DELETE statement.
      * @return The complete DELETE SQL query as a string.
