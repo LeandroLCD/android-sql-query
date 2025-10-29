@@ -82,6 +82,20 @@ class QuerySelect private constructor(
         )
     }
 
+    override fun getSqlOperators(): List<SQLOperator<*>> {
+        return operations.values.map {
+            it.operator
+        }
+    }
+
+    override fun getTableName(): String {
+        return table
+    }
+
+    override fun getSqlOperation(key: String): SQLOperator<*>? {
+        return operations.get(key)?.operator
+    }
+
     /**
      * Generates the SQL string for the SELECT statement.
      * @return The complete SELECT SQL query as a string.
