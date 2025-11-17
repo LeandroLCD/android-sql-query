@@ -204,15 +204,7 @@ class QueryDelete private constructor(
          * @throws IllegalArgumentException if the WHERE clause is not set.
          */
         fun build(): QueryDelete {
-            if(where == null){
-                val w = operations.firstNotNullOfOrNull{it}.let {
-                    it ?: throw IllegalArgumentException("A WHERE clause must be specified.")
-                }
-                operations.remove(w.key)
-
-                where = w.value.operator
-            }
-
+            require(where != null) { "A WHERE clause must be specified." }
             return QueryDelete(
                 where = where!!, table = table, operations = operations
             )
