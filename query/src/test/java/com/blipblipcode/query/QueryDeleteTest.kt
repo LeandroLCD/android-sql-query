@@ -43,7 +43,6 @@ class QueryDeleteTest {
     @Test
     fun `build without where clause throws exception`() {
         val builder = QueryDelete.builder("users")
-            .and("status", SQLOperator.Equals("status", "active"))
 
         assertThrows(IllegalArgumentException::class.java) {
             builder.build()
