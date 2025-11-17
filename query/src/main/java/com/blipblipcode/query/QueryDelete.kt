@@ -64,8 +64,9 @@ class QueryDelete private constructor(
     }
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
-        return operations.values.map {
-            it.operator
+        return buildList {
+            add(where)
+            operations.values.forEach { add(it.operator) }
         }
     }
 
@@ -203,7 +204,15 @@ class QueryDelete private constructor(
          * @throws IllegalArgumentException if the WHERE clause is not set.
          */
         fun build(): QueryDelete {
-            require(where != null) { "A WHERE clause must be specified." }
+            if(where == null){
+                val w = operations.firstNotNullOfOrNull{it}.let {
+                    it ?: throw IllegalArgumentException("A WHERE clause must be specified.")
+                }
+                operations.remove(w.key)
+
+                where = w.value.operator
+            }
+
             return QueryDelete(
                 where = where!!, table = table, operations = operations
             )

@@ -88,8 +88,9 @@ class QuerySelect private constructor(
     }
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
-        return operations.values.map {
-            it.operator
+        return buildList {
+            add(where)
+            operations.values.forEach { add(it.operator) }
         }
     }
 
@@ -319,7 +320,14 @@ class QuerySelect private constructor(
          * @throws IllegalArgumentException if the WHERE clause is not set.
          */
         fun build(): QuerySelect {
-            require(where != null) { "A WHERE clause must be specified." }
+            if(where == null){
+                val w = operations.firstNotNullOfOrNull{it}.let {
+                    it ?: throw IllegalArgumentException("WHERE clause is required for QuerySelect")
+                }
+                operations.remove(w.key)
+
+                where = w.value.operator
+            }
             return QuerySelect(
                 where = where!!,
                 table = table,
