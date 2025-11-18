@@ -17,7 +17,7 @@ import com.blipblipcode.query.operator.SQLOperator
  * @property fields The list of columns to be returned in the result set. Defaults to "*".
  */
 class QuerySelect private constructor(
-    private var where: SQLOperator<*>,
+    private var where: SQLOperator<*>?,
     private val table: String,
     private val operations: LinkedHashMap<String, LogicalOperation>,
     private val fields: List<String>
@@ -89,7 +89,7 @@ class QuerySelect private constructor(
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
-            add(where)
+            where?.let { add(it) }
             operations.values.forEach { add(it.operator) }
         }
     }
@@ -110,7 +110,11 @@ class QuerySelect private constructor(
         val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
         val operationsStr = if (operations.isNotEmpty()) operations.values.joinToString(" ") { it.asString() } else ""
         return buildString {
-            append("SELECT $fieldStr FROM $table WHERE ${where.toSQLString()} $operationsStr".trim())
+            if (where == null) {
+                append("SELECT $fieldStr FROM $table")
+            }else{
+                append("SELECT $fieldStr FROM $table WHERE ${where?.toSQLString()} $operationsStr".trim())
+            }
             if (orderBy != null) {
                 append(" ")
                 append(orderBy!!.asString())
@@ -320,9 +324,11 @@ class QuerySelect private constructor(
          * @throws IllegalArgumentException if the WHERE clause is not set.
          */
         fun build(): QuerySelect {
-            require(where != null) { "WHERE clause is required for QuerySelect" }
+            if(operations.isNotEmpty()){
+                require(where != null) { "WHERE clause is required for QuerySelect" }
+            }
             return QuerySelect(
-                where = where!!,
+                where = where,
                 table = table,
                 operations = LinkedHashMap(operations),
                 fields = fields
