@@ -320,14 +320,7 @@ class QuerySelect private constructor(
          * @throws IllegalArgumentException if the WHERE clause is not set.
          */
         fun build(): QuerySelect {
-            if(where == null){
-                val w = operations.firstNotNullOfOrNull{it}.let {
-                    it ?: throw IllegalArgumentException("WHERE clause is required for QuerySelect")
-                }
-                operations.remove(w.key)
-
-                where = w.value.operator
-            }
+            require(where != null) { "WHERE clause is required for QuerySelect" }
             return QuerySelect(
                 where = where!!,
                 table = table,
