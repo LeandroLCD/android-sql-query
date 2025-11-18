@@ -75,7 +75,7 @@ class QueryUpdate private constructor(
     }
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
-        return emptyList()
+        return listOf(where)
     }
 
     override fun getTableName(): String {

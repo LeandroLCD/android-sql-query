@@ -64,8 +64,9 @@ class QueryDelete private constructor(
     }
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
-        return operations.values.map {
-            it.operator
+        return buildList {
+            add(where)
+            operations.values.forEach { add(it.operator) }
         }
     }
 
