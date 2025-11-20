@@ -162,8 +162,8 @@ class QueryDelete private constructor(
          * @param operator The SQL operator for this condition.
          * @return The `QueryBuilder` instance for chaining.
          */
-        fun like(key: String, operator: SQLOperator<*>): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.LIKE, operator)
+        fun like(key: String, operator: SQLOperator.Like): QueryBuilder {
+            operations[key] = LogicalOperation(LogicalType.AND, operator)
             return this
         }
 

@@ -35,14 +35,19 @@ class UnionQuery private constructor(
      */
     override fun asSql(): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-
+        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
+            query.getOrderBy()?.let { acc.add(it) }
+            query.orderBy(null)
+            acc
+        }
+        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
         
         return buildString {
             append(queries.joinToString("\n$unionKeyword\n") { it.asSql() })
-            if (orderBy != null) {
+            if (orders.isNotEmpty()) {
                 appendLine()
-                append(orderBy!!.asString())
+                append(OrderBy.Multiple(orders).asString())
             }
         }
     }
