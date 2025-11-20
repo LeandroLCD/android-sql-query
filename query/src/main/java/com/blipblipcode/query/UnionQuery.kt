@@ -35,14 +35,19 @@ class UnionQuery private constructor(
      */
     override fun asSql(): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-
+        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
+            query.getOrderBy()?.let { acc.add(it) }
+            query.orderBy(null)
+            acc
+        }
+        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
         
         return buildString {
             append(queries.joinToString("\n$unionKeyword\n") { it.asSql() })
-            if (orderBy != null) {
+            if (orders.isNotEmpty()) {
                 appendLine()
-                append(orderBy!!.asString())
+                append(OrderBy.Multiple(orders).asString())
             }
         }
     }
@@ -51,7 +56,7 @@ class UnionQuery private constructor(
      * Appends an ORDER BY clause to the entire UNION query.
      * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
      *
-     * @param columns A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
+     * @param operator A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
      * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
      */
     fun orderBy(operator: OrderBy): Queryable {

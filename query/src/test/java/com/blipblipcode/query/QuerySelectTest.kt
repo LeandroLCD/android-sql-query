@@ -2,6 +2,7 @@ package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
+import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
 import org.junit.Assert.assertEquals
@@ -356,6 +357,375 @@ class QuerySelectTest {
             .limit(10, -5)
             .build()
         val expectedSql = "SELECT * FROM users WHERE status = 'active' LIMIT 10 OFFSET -5"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with ascending order`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Asc("name"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY name ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with descending order`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Desc("created_at"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY created_at DESC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with multiple columns ascending`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("name"),
+            OrderBy.Asc("age")
+        )))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY name ASC, age ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with multiple columns mixed directions`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("status"),
+            OrderBy.Desc("created_at")
+        )))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY status ASC, created_at DESC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with descending then ascending`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Desc("priority"),
+            OrderBy.Asc("name")
+        )))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY priority DESC, name ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with ascending and descending columns`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("department"),
+            OrderBy.Desc("salary")
+        )))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY department ASC, salary DESC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with limit and ascending order`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(10)
+            .build()
+        query.orderBy(OrderBy.Asc("name"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY name ASC LIMIT 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with limit and descending order`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .limit(5, 10)
+            .build()
+        query.orderBy(OrderBy.Desc("created_at"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY created_at DESC LIMIT 5 OFFSET 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy chaining call`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        val instance = query.orderBy(OrderBy.Asc("name"))
+        assertEquals(query, instance)
+    }
+
+    @Test
+    fun `orderBy replacing previous order`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Desc("created_at"))
+        query.orderBy(OrderBy.Asc("name"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY name ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with null value`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(null)
+        val expectedSql = "SELECT * FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with three columns mixed directions`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("department"),
+            OrderBy.Desc("created_at"),
+            OrderBy.Asc("name")
+        )))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY department ASC, created_at DESC, name ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with special characters in column names`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .build()
+        query.orderBy(OrderBy.Asc("`first name`"))
+        val expectedSql = "SELECT * FROM users WHERE status = 'active' ORDER BY `first name` ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy with multiple columns and special characters`() {
+        val query = QuerySelect.builder("`user table`")
+            .where(SQLOperator.Equals("`user id`", 1))
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("`first name`"),
+            OrderBy.Desc("`last name`")
+        )))
+        val expectedSql = "SELECT * FROM `user table` WHERE `user id` = 1 ORDER BY `first name` ASC, `last name` DESC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `orderBy ascending with multiple logical operations`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .and("status", SQLOperator.Equals("status", "active"))
+            .or("role", SQLOperator.Equals("role", "admin"))
+            .build()
+        query.orderBy(OrderBy.Asc("created_at"))
+        val expectedSql = "SELECT * FROM users WHERE id = 1 AND status = 'active' OR role = 'admin' ORDER BY created_at ASC"
+        assertEquals(expectedSql, query.asSql())
+    }
+
+    @Test
+    fun `orderBy descending with multiple logical operations`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .and("status", SQLOperator.Equals("status", "active"))
+            .or("role", SQLOperator.Equals("role", "admin"))
+            .build()
+        query.orderBy(OrderBy.Desc("created_at"))
+        val expectedSql = "SELECT * FROM users WHERE id = 1 AND status = 'active' OR role = 'admin' ORDER BY created_at DESC"
+        assertEquals(expectedSql, query.asSql())
+    }
+
+    @Test
+    fun `orderBy multiple with specific fields`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("name", "email", "created_at")
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("name"),
+            OrderBy.Desc("created_at")
+        )))
+        val expectedSql = "SELECT name, email, created_at FROM users WHERE status = 'active' ORDER BY name ASC, created_at DESC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with single field alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .setFields("name AS full_name")
+            .build()
+        val expectedSql = "SELECT name AS full_name FROM users WHERE id = 1"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with multiple fields with aliases`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("name AS full_name", "email AS user_email", "created_at AS registration_date")
+            .build()
+        val expectedSql = "SELECT name AS full_name, email AS user_email, created_at AS registration_date FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with mixed fields and aliases`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("id", "name AS full_name", "email")
+            .build()
+        val expectedSql = "SELECT id, name AS full_name, email FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with function and alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("COUNT(*) AS total_users", "name AS user_name")
+            .build()
+        val expectedSql = "SELECT COUNT(*) AS total_users, name AS user_name FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with uppercase alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .setFields("name AS NAME", "email AS EMAIL")
+            .build()
+        val expectedSql = "SELECT name AS NAME, email AS EMAIL FROM users WHERE id = 1"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with backtick quoted alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .setFields("`name` AS `full name`", "`email` AS `user email`")
+            .build()
+        val expectedSql = "SELECT `name` AS `full name`, `email` AS `user email` FROM users WHERE id = 1"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with table prefix and alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("users.id", 1))
+            .setFields("users.name AS full_name", "users.email AS user_email")
+            .build()
+        val expectedSql = "SELECT users.name AS full_name, users.email AS user_email FROM users WHERE users.id = 1"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with aliases and orderBy`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("name AS full_name", "created_at AS registration_date")
+            .build()
+        query.orderBy(OrderBy.Asc("full_name"))
+        val expectedSql = "SELECT name AS full_name, created_at AS registration_date FROM users WHERE status = 'active' ORDER BY full_name ASC"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with aliases and limit`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("name AS full_name", "email AS user_email")
+            .limit(10)
+            .build()
+        val expectedSql = "SELECT name AS full_name, email AS user_email FROM users WHERE status = 'active' LIMIT 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with aliases orderBy and limit combined`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("name AS full_name", "created_at AS registration_date", "email AS user_email")
+            .limit(5, 10)
+            .build()
+        query.orderBy(OrderBy.Multiple(listOf(
+            OrderBy.Asc("registration_date"),
+            OrderBy.Desc("full_name")
+        )))
+        val expectedSql = "SELECT name AS full_name, created_at AS registration_date, email AS user_email FROM users WHERE status = 'active' ORDER BY registration_date ASC, full_name DESC LIMIT 5 OFFSET 10"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with CASE statement and alias`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .setFields("CASE WHEN status = 'active' THEN 'Active User' ELSE 'Inactive' END AS user_status")
+            .build()
+        val expectedSql = "SELECT CASE WHEN status = 'active' THEN 'Active User' ELSE 'Inactive' END AS user_status FROM users WHERE id = 1"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with aggregate functions and aliases`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("COUNT(*) AS total", "SUM(salary) AS total_salary", "AVG(salary) AS average_salary")
+            .build()
+        val expectedSql = "SELECT COUNT(*) AS total, SUM(salary) AS total_salary, AVG(salary) AS average_salary FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with mathematical expression and alias`() {
+        val query = QuerySelect.builder("products")
+            .where(SQLOperator.Equals("category", "electronics"))
+            .setFields("name", "price", "price * 0.1 AS discount_amount")
+            .build()
+        val expectedSql = "SELECT name, price, price * 0.1 AS discount_amount FROM products WHERE category = 'electronics'"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with alias immutability`() {
+        val originalQuery = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .build()
+        val originalSql = originalQuery.asSql()
+
+        originalQuery.setFields("name AS full_name", "email AS user_email")
+
+        assertEquals(originalSql, originalQuery.asSql())
+    }
+
+    @Test
+    fun `setFields replacing previous fields with aliases`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("status", "active"))
+            .setFields("id", "name")
+            .build()
+        val newQuery = query.setFields("name AS full_name", "email AS user_email", "created_at AS registration_date")
+        val expectedSql = "SELECT name AS full_name, email AS user_email, created_at AS registration_date FROM users WHERE status = 'active'"
+        assertEquals(expectedSql, newQuery.asSql().trim())
+    }
+
+    @Test
+    fun `setFields with multiple aliases using builder`() {
+        val query = QuerySelect.builder("employees")
+            .where(SQLOperator.Equals("department", "sales"))
+            .setFields("employee_id AS id", "first_name AS fname", "last_name AS lname", "salary AS monthly_salary")
+            .build()
+        val expectedSql = "SELECT employee_id AS id, first_name AS fname, last_name AS lname, salary AS monthly_salary FROM employees WHERE department = 'sales'"
         assertEquals(expectedSql, query.asSql().trim())
     }
 }

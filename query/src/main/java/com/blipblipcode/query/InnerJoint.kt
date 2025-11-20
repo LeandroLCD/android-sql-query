@@ -38,6 +38,12 @@ class InnerJoint private constructor(
     override fun asSql(): String {
         require(queries.isNotEmpty()) { "At least one query is required for an INNER JOIN" }
         require(queries.size == onClauses.size) { "The number of queries must be equal to the number of ON clauses (including a placeholder for the base query)" }
+        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
+            query.getOrderBy()?.let { acc.add(it) }
+            query.orderBy(null)
+            acc
+        }
+        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
 
         val baseQuery = queries.first()
         val joins = queries.drop(1).zip(onClauses.drop(1)) { query, onClause ->
@@ -46,9 +52,9 @@ class InnerJoint private constructor(
 
         return buildString {
             append("${baseQuery.asSql()} ${joins.joinToString(" ")}")
-            if (orderBy != null) {
+            if (orders.isNotEmpty()) {
                 appendLine()
-                append(orderBy!!.asString())
+                append(OrderBy.Multiple(orders).asString())
             }
         }
     }

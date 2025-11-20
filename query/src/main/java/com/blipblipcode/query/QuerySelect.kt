@@ -87,6 +87,7 @@ class QuerySelect private constructor(
         }
     }
 
+
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
             where?.let { add(it) }
@@ -133,7 +134,7 @@ class QuerySelect private constructor(
      * @param operator A vararg of `[OrderBy]` objects specifying the columns and direction for sorting.
      * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
      */
-    fun orderBy(operator: OrderBy): Queryable {
+    fun orderBy(operator: OrderBy?): Queryable {
         orderBy = operator
         return this
     }
@@ -159,6 +160,10 @@ class QuerySelect private constructor(
     fun limit(limitOperator: Limit): QuerySelect {
         limit = limitOperator
         return this
+    }
+
+    fun getOrderBy(): OrderBy? {
+        return this.orderBy
     }
 
 
@@ -241,8 +246,8 @@ class QuerySelect private constructor(
          * @param operator The SQL operator for this condition.
          * @return The `QueryBuilder` instance for chaining.
          */
-        fun like(key: String, operator: SQLOperator<*>): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.LIKE, operator)
+        fun like(key: String, operator: SQLOperator.Like): QueryBuilder {
+            operations[key] = LogicalOperation(LogicalType.AND, operator)
             return this
         }
 
@@ -295,6 +300,9 @@ class QuerySelect private constructor(
         fun orderBy(orderBy: OrderBy): QueryBuilder {
             this.orderBy = orderBy
             return this
+        }
+        fun getOrderBy(): OrderBy? {
+            return this.orderBy
         }
 
         /**

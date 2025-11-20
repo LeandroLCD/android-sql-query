@@ -8,8 +8,6 @@ enum class LogicalType(val sql: String) {
     AND("AND"),
     /** Represents a logical OR operation. */
     OR("OR"),
-    /** Represents a SQL LIKE operation. */
-    LIKE("LIKE"),
     /** Represents a SQL ALL operation. */
     ALL("ALL"),
 
