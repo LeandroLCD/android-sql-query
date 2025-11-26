@@ -11,6 +11,8 @@ sealed interface SQLOperator<T> {
     val column: String
     val value: T
 
+    val caseConversion: CaseConversion
+
     /**
      * Returns a `Pair` of the column name and its value.
      */
@@ -26,67 +28,95 @@ sealed interface SQLOperator<T> {
             is String -> "'$value'"
             else -> value.toString()
         }
-        return "$column $symbol $valueStr"
+        return "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction(valueStr)}"
     }
 
     /**
      * Provides a simple string representation of the operator.
      */
-    fun asString(): String = "$column $symbol $value"
+    fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction(value.toString())}"
 
     /** Represents an "=" operation. */
-    data class Equals<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class Equals<T>(
+        override val column: String,
+        override val value: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE
+    ) : SQLOperator<T> {
         override val symbol: String = "="
     }
 
     /** Represents a "!=" operation. */
-    data class NotEquals<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class NotEquals<T>(
+        override val column: String,
+        override val value: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "!="
     }
 
     /** Represents a ">" operation. */
-    data class GreaterThan<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class GreaterThan<T>(
+        override val column: String,
+        override val value: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = ">"
     }
 
     /** Represents a "<" operation. */
-    data class LessThan<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class LessThan<T>(
+        override val column: String,
+        override val value: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "<"
     }
 
     /** Represents a ">=" operation. */
-    data class GreaterThanOrEqual<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class GreaterThanOrEqual<T>(
+    override val column: String,
+    override val value: T,
+    override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = ">="
     }
 
     /** Represents a "<=" operation. */
-    data class LessThanOrEqual<T>(override val column: String, override val value: T) : SQLOperator<T> {
+    data class LessThanOrEqual<T>(
+        override val column: String,
+        override val value: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "<="
     }
 
     /** Represents a "LIKE" operation. */
-    data class Like(override val column: String, override val value: String) : SQLOperator<String> {
+    data class Like(
+        override val column: String,
+        override val value: String,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<String> {
         override val symbol: String = "LIKE"
         override fun toSQLString(): String {
-            return "$column $symbol '%$value%'"
+            return "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction("'%$value%'")}"
         }
     }
 
     /** Represents an "IN" operation. */
-    data class In<T>(override val column: String, override val value: List<T>) : SQLOperator<List<T>> {
+    data class In<T>(
+        override val column: String,
+        override val value: List<T>,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { if (it is String) "'$it'" else it.toString() }
-            return "$column $symbol ($list)"
+            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString()) }
+            return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
 
     /** Represents a "NOT IN" operation. */
-    data class NotIn<T>(override val column: String, override val value: List<T>) : SQLOperator<List<T>> {
+    data class NotIn<T>(
+        override val column: String,
+        override val value: List<T>,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "NOT IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { if (it is String) "'$it'" else it.toString() }
-            return "$column $symbol ($list)"
+            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString())}
+            return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
 
@@ -94,6 +124,7 @@ sealed interface SQLOperator<T> {
     data class IsNull(override val column: String) : SQLOperator<Unit> {
         override val symbol: String = "IS NULL"
         override val value: Unit = Unit
+        override val caseConversion: CaseConversion = CaseConversion.NONE
         override fun toSQLString(): String = "$column $symbol"
         override fun asString(): String = "$column $symbol"
     }
@@ -102,19 +133,23 @@ sealed interface SQLOperator<T> {
     data class IsNotNull(override val column: String) : SQLOperator<Unit> {
         override val symbol: String = "IS NOT NULL"
         override val value: Unit = Unit
+        override val caseConversion: CaseConversion = CaseConversion.NONE
         override fun toSQLString(): String = "$column $symbol"
         override fun asString(): String = "$column $symbol"
     }
 
     /** Represents a "BETWEEN" operation. */
-    data class Between<T>(override val column: String, val start: T, val end: T) : SQLOperator<Pair<T, T>> {
+    data class Between<T>(
+        override val column: String,
+        val start: T, val end: T,
+        override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<Pair<T, T>> {
         override val symbol: String = "BETWEEN"
         override val value: Pair<T, T> = start to end
         override fun toSQLString(): String {
-            val startStr = if (start is String) "'$start'" else start.toString()
-            val endStr = if (end is String) "'$end'" else end.toString()
-            return "$column $symbol $startStr AND $endStr"
+            val startStr = caseConversion.asSqlFunction(start.toString())
+            val endStr = caseConversion.asSqlFunction(end.toString())
+            return "${caseConversion.asSqlFunction(column)} $symbol $startStr AND $endStr"
         }
-        override fun asString(): String = "$column $symbol $start AND $end"
+        override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction(start.toString())} AND ${caseConversion.asSqlFunction(start.toString())}"
     }
 }
