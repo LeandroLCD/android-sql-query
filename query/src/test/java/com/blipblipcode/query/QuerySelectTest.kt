@@ -1,5 +1,6 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.operator.CaseConversion
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
@@ -193,6 +194,24 @@ class QuerySelectTest {
             .build()
         val expectedSql = "SELECT * FROM users WHERE id = 1"
         assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `asSql with a basic WHERE `() {
+        val query = QuerySelect.builder("users")
+            .build()
+        val expectedSql = "SELECT * FROM users"
+        assertEquals(expectedSql, query.asSql().trim())
+    }
+
+    @Test
+    fun `asSql with a WHERE clause and uppercase`() {
+        val query = QuerySelect.builder("users")
+            .where(SQLOperator.Equals("id", 1))
+            .and("status", SQLOperator.Equals("status", "active", caseConversion = CaseConversion.UPPER))
+            .build()
+        val expectedSql = "SELECT * FROM users WHERE id = 1 AND UPPER(status) = UPPER('active')"
+        assertEquals(expectedSql, query.asSql())
     }
 
     @Test
