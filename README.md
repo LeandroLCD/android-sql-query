@@ -4,7 +4,7 @@
 
 ### Una librería de Kotlin ligera y fluida para construir consultas SQL de forma programática
 
-[![Kotlin](https://img.shields.io/badge/Kotlin-1.9+-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.21+-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Android-API%2021+-green.svg?style=flat&logo=android)](https://developer.android.com)
 [![Room](https://img.shields.io/badge/Room-Compatible-blue.svg?style=flat)](https://developer.android.com/training/data-storage/room)
 ![GitHub release (latest by date)](https://img.shields.io/github/v/release/LeandroLCD/android-sql-query)
