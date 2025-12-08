@@ -11,10 +11,17 @@ sealed interface OrderBy {
             is Multiple -> orders.joinToString(", ") { it.asSqlClause() }
         }
     }
+    fun clone(vararg params: Any?): OrderBy
+
     data class Asc(override val column: String) : OrderBy{
         override fun asString(): String {
             return "ORDER BY $column ASC"
         }
+
+        override fun clone(vararg params: Any?): OrderBy {
+            return this.copy(params[0] as String)
+        }
+
         override fun toString(): String {
             return "ORDER BY $column ASC"
         }
@@ -23,8 +30,13 @@ sealed interface OrderBy {
         override fun asString(): String {
             return "ORDER BY $column DESC"
         }
+
         override fun toString(): String {
             return "ORDER BY $column DESC"
+        }
+
+        override fun clone(vararg params: Any?): OrderBy {
+            return this.copy(params[0] as String)
         }
     }
 
@@ -36,8 +48,30 @@ sealed interface OrderBy {
             return "ORDER BY ${asSqlClause()}"
         }
 
+        override fun clone(vararg params: Any?): OrderBy {
+            val newOrders = params.getOrNull(0) as? List<*>
+                ?: return this.copy()
+
+            if (newOrders.all { it is OrderBy }) {
+                @Suppress("UNCHECKED_CAST")
+                return this.copy(orders = newOrders as List<OrderBy>)
+            }
+            throw IllegalArgumentException("The parameters provided for cloning are not of the List type<OrderBy>.")
+        }
+
         override fun toString(): String {
             return "ORDER BY ${asSqlClause()}"
         }
+
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is Multiple) return false
+            return orders == other.orders
+        }
+
+        override fun hashCode(): Int {
+            return orders.hashCode()
+        }
     }
+
 }

@@ -103,7 +103,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString()) }
+            val list = value.joinToString(", ") {
+                "'${caseConversion.asSqlFunction(it.toString())}'"
+            }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
@@ -115,7 +117,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "NOT IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString())}
+            val list = value.joinToString(", ") {
+                "'${caseConversion.asSqlFunction(it.toString())}'"
+            }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
