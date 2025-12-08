@@ -1,48 +1,61 @@
 package com.blipblipcode.query.operator
 
-sealed interface OrderBy {
-    val column: String
-    fun asString(): String
+sealed interface OrderBy:SQLOperator<String> {
+    override val column: String
+    override val symbol: String
+    override val value: String
+    override val caseConversion: CaseConversion
+    override fun asString(): String
 
     fun asSqlClause(): String {
         return when (this) {
-            is Asc -> "$column ASC"
-            is Desc -> "$column DESC"
+            is Asc , is Desc -> "${caseConversion.asSqlFunction(column)} $value"
             is Multiple -> orders.joinToString(", ") { it.asSqlClause() }
         }
     }
     fun clone(vararg params: Any?): OrderBy
 
     data class Asc(override val column: String) : OrderBy{
+        override val symbol: String = "ORDER BY"
+        override val value: String = "ASC"
+        override val caseConversion: CaseConversion = CaseConversion.NONE
         override fun asString(): String {
-            return "ORDER BY $column ASC"
+            return "$symbol ${caseConversion.asSqlFunction(column)} $value"
         }
 
         override fun clone(vararg params: Any?): OrderBy {
-            return this.copy(params[0] as String)
+            return this.copy(column = params[0] as String)
         }
 
         override fun toString(): String {
-            return "ORDER BY $column ASC"
+            return asString()
         }
     }
     data class Desc(override val column: String) : OrderBy{
-        override fun asString(): String {
-            return "ORDER BY $column DESC"
-        }
+        override val symbol: String = "ORDER BY"
+        override val value: String = "DESC"
+        override val caseConversion: CaseConversion = CaseConversion.NONE
 
-        override fun toString(): String {
-            return "ORDER BY $column DESC"
+        override fun asString(): String {
+            return "$symbol ${caseConversion.asSqlFunction(column)} $value"
         }
 
         override fun clone(vararg params: Any?): OrderBy {
-            return this.copy(params[0] as String)
+            return this.copy(column = params[0] as String)
+        }
+
+        override fun toString(): String {
+            return asString()
         }
     }
 
     data class Multiple(val orders: List<OrderBy>) : OrderBy{
         override val column: String
             get() = orders.joinToString(", ") { it.column }
+        override val symbol: String = "ORDER BY"
+        override val value: String = orders.joinToString(", ") { it.value }
+        override val caseConversion: CaseConversion = CaseConversion.NONE
+
 
         override fun asString(): String {
             return "ORDER BY ${asSqlClause()}"
