@@ -102,6 +102,8 @@ class QuerySelect private constructor(
         return buildList {
             where?.let { add(it) }
             operations.values.forEach { add(it.operator) }
+            orderBy?.let { add(it) }
+            limit?.let { add(it) }
         }
     }
 
