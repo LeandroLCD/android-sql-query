@@ -17,6 +17,7 @@ Diseñada para integrarse perfectamente con la base de datos de Android y Room a
 [Instalación](#-instalación) •
 [Uso](#-uso) •
 [Integración con Room](#-integración-con-room) •
+[RepeatedQueryParameters](#-repeatedqueryparameters) •
 [Contribuir](#-contribuir)
 
 </div>
@@ -34,6 +35,7 @@ Diseñada para integrarse perfectamente con la base de datos de Android y Room a
   - [DELETE](#-delete)
   - [INNER JOIN](#-inner-join)
 - [🔗 Integración con Room](#-integración-con-room)
+- [📡 RepeatedQueryParameters](#-repeatedqueryparameters)
 - [📝 Ejemplos Avanzados](#-ejemplos-avanzados)
 - [🤝 Contribuir](#-contribuir)
 
@@ -206,6 +208,67 @@ class UserRepository(private val userDao: UserDao) {
     }
 }
 ```
+
+---
+
+## 📡 RepeatedQueryParameters
+
+`RepeatedQueryParameters` es una clase utilitaria destinada a facilitar el uso de parámetros de consulta repetidos cuando se integra con Retrofit y otras librerías que consumen `Map`/`QueryMap` de parámetros.
+
+Descripción breve:
+- Permite pasar listas como valores en un `@QueryMap` y que Retrofit las expanda como múltiples pares clave=valor en la URL (ej: `?tag=a&tag=b`).
+- Mantiene el orden de inserción (hereda de `LinkedHashMap`) para reproducibilidad en pruebas y cachés.
+- Omite elementos `null` dentro de listas y lanza excepción si se intenta usar una clave o valor `null`.
+
+API y métodos principales:
+- `RepeatedQueryParameters.create(vararg pairs: Pair<String, Any>): RepeatedQueryParameters` — Crea la instancia a partir de pares clave/valor.
+- `RepeatedQueryParameters.fromMap(map: MutableMap<String, Any>): RepeatedQueryParameters` — Convierte un `Map` existente.
+- `RepeatedQueryParameters.empty(): RepeatedQueryParameters` — Instancia vacía.
+- `addParameter(key: String, value: Any)` — Agrega o reemplaza un parámetro simple.
+- `addRepeatedParameter(key: String, values: List<*>)` — Agrega una lista que será expandida.
+
+Compatibilidad con la extensión `Queryable.asQueryRepeatedQueryParameters`:
+
+La librería expone una extensión `Queryable.asQueryRepeatedQueryParameters()` que convierte los operadores SQL (devueltos por `getSqlOperators()`) en una instancia de `RepeatedQueryParameters`. Esta extensión:
+- Filtra los operadores usando un `predicate: (Pair<String, Any?>) -> Boolean` opcional.
+- Expande automáticamente listas en `RepeatedQueryParameters` mediante `addRepeatedParameter`.
+
+Ejemplo usando la extensión `asQueryRepeatedQueryParameters`:
+
+```kotlin
+// Supongamos que `query` es un QuerySelect u otro Queryable con operadores que incluyen listas
+val params = query.asQueryRepeatedQueryParameters()
+// ahora `params` puede ser pasado directamente a Retrofit como @QueryMap
+```
+
+Ejemplo de uso con Retrofit:
+
+```kotlin
+interface ProductApi {
+    @GET("api/v2/product/list")
+    suspend fun getProductList(
+        @QueryMap options: RepeatedQueryParameters
+    ): ResponsePaginListDto<ProductItemDto>
+}
+
+// Construcción de parámetros
+val options = RepeatedQueryParameters.create(
+    "limit" to 50,
+    "offset" to 0,
+    "status" to listOf("active", "pending"),
+    "brand" to "michelin",
+    "sort" to "date"
+)
+
+// Llamada al API
+val response = api.getProductList(options = options)
+// Resultado en URL: ?limit=50&offset=0&status=active&status=pending&brand=michelin&sort=date
+```
+
+Notas de uso y buenas prácticas:
+- Evita pasar valores `null` como clave o valor (la clase lanza excepción).
+- Para agregar dinámicamente parámetros desde un `Queryable`, usa `asQueryRepeatedQueryParameters()` y opcionalmente provee un `predicate` para incluir/excluir pares.
+- Mantén simples los valores no list (String, Int, Boolean); las listas son las que generan repetición en la URL.
 
 ---
 
