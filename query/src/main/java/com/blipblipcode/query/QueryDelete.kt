@@ -14,7 +14,7 @@ import com.blipblipcode.query.operator.SQLOperator
  * @property operations A map of logical operations (AND, OR, etc.) to be appended to the WHERE clause.
  */
 class QueryDelete private constructor(
-    private var where: SQLOperator<*>,
+    private var where: SQLOperator<*>?,
     private val table: String,
     private val operations: LinkedHashMap<String, LogicalOperation>,
 ):Queryable {
@@ -42,6 +42,12 @@ class QueryDelete private constructor(
         return this
     }
 
+    fun clear() : QueryDelete {
+        operations.clear()
+        where = null
+        return this
+    }
+
     /**
      * Sets or replaces the main WHERE clause of the query.
      * @param operator The new SQL operator for the WHERE clause.
@@ -65,7 +71,8 @@ class QueryDelete private constructor(
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
-            add(where)
+            require(where != null) { "A WHERE clause must be specified." }
+            add(where!!)
             operations.values.forEach { add(it.operator) }
         }
     }
@@ -81,9 +88,22 @@ class QueryDelete private constructor(
     /**
      * Generates the SQL string for the DELETE statement.
      * @return The complete DELETE SQL query as a string.
+     * @throws IllegalArgumentException if the WHERE clause is not set.
      */
     override fun asSql(): String {
-        return "DELETE FROM $table WHERE ${where.toSQLString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
+        require(where != null) { "A WHERE clause must be specified." }
+        return "DELETE FROM $table WHERE ${where!!.toSQLString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
+    }
+
+    /**
+     * Generates the SQL string for the DELETE statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete DELETE SQL query as a string.
+     * @throws IllegalArgumentException if the WHERE clause is not set.
+     */
+    override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
+        require(where != null) { "A WHERE clause must be specified." }
+        return "DELETE FROM $table WHERE ${where!!.toSQLString()} ${operations.values.filter { predicate(it.operator) }.joinToString(" ") { it.asString() }}".trim()
     }
 
     /**
@@ -94,6 +114,16 @@ class QueryDelete private constructor(
         private val table: String, private val operations: LinkedHashMap<String, LogicalOperation>
     ) {
         private var where: SQLOperator<*>? = null
+
+        /**
+         * Clears all conditions and resets the builder.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun clear() : QueryBuilder {
+            operations.clear()
+            where = null
+            return this
+        }
 
         /**
          * Adds an AND condition to the WHERE clause.

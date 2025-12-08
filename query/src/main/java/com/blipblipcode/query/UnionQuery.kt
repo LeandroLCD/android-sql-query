@@ -51,6 +51,30 @@ class UnionQuery private constructor(
             }
         }
     }
+    /**
+     * Generates the SQL string for the UNION statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete UNION SQL query as a string.
+     * @throws IllegalArgumentException if less than two queries are provided.
+     */
+    override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
+        require(queries.size >= 2) { "At least two queries are required for a UNION" }
+        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
+            query.getOrderBy()?.let { acc.add(it) }
+            query.orderBy(null)
+            acc
+        }
+        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
+        val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
+
+        return buildString {
+            append(queries.joinToString("\n$unionKeyword\n") { it.asSql(predicate) })
+            if (orders.isNotEmpty()) {
+                appendLine()
+                append(OrderBy.Multiple(orders).asString())
+            }
+        }
+    }
 
     /**
      * Appends an ORDER BY clause to the entire UNION query.
@@ -62,6 +86,13 @@ class UnionQuery private constructor(
     fun orderBy(operator: OrderBy): Queryable {
         orderBy = operator
         return this
+    }
+    /**
+     * Retrieves the current ORDER BY clause for the INNER JOIN query.
+     * @return The `OrderBy` object if set, otherwise null.
+     */
+    fun getOrderBy(): OrderBy? {
+        return orderBy
     }
 
     /**

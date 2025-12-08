@@ -60,6 +60,36 @@ class InnerJoint private constructor(
     }
 
     /**
+     * Generates the SQL string for the INNER JOIN statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete INNER JOIN SQL query as a string.
+     * @throws IllegalArgumentException
+     */
+    override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
+        require(queries.isNotEmpty()) { "At least one query is required for an INNER JOIN" }
+        require(queries.size == onClauses.size) { "The number of queries must be equal to the number of ON clauses (including a placeholder for the base query)" }
+        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
+            query.getOrderBy()?.let { acc.add(it) }
+            query.orderBy(null)
+            acc
+        }
+        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
+
+        val baseQuery = queries.first()
+        val joins = queries.drop(1).zip(onClauses.drop(1)) { query, onClause ->
+            "\nINNER JOIN \n${query.asSql(predicate)} \nON $onClause"
+        }
+
+        return buildString {
+            append("${baseQuery.asSql()} ${joins.joinToString(" ")}")
+            if (orders.isNotEmpty()) {
+                appendLine()
+                append(OrderBy.Multiple(orders).asString())
+            }
+        }
+    }
+
+    /**
      * Appends an ORDER BY clause to the entire UNION query.
      * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
      *
@@ -69,6 +99,13 @@ class InnerJoint private constructor(
     fun orderBy(operator: OrderBy): Queryable {
         orderBy = operator
         return this
+    }
+    /**
+     * Retrieves the current ORDER BY clause for the INNER JOIN query.
+     * @return The `OrderBy` object if set, otherwise null.
+     */
+    fun getOrderBy(): OrderBy? {
+        return orderBy
     }
 
     /**

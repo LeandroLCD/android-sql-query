@@ -49,6 +49,16 @@ class QuerySelect private constructor(
     }
 
     /**
+     * Clears all logical operations and the main WHERE clause from the query.
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun clear(): QuerySelect {
+        operations.clear()
+        where = null
+        return this
+    }
+
+    /**
      * Sets or replaces the main WHERE clause of the query.
      * @param operator The new SQL operator for the WHERE clause.
      * @return The current `QuerySelect` instance for chaining.
@@ -126,6 +136,30 @@ class QuerySelect private constructor(
             }
         }
     }
+    /**
+     * Generates the SQL string for the SELECT statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete SELECT SQL query as a string.
+     */
+    override fun asSql(predicate: ( SQLOperator<*>) -> Boolean): String {
+        val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
+        val operationsStr = if (operations.isNotEmpty()) operations.values.filter { predicate(it.operator) }.joinToString(" ") { it.asString() } else ""
+        return buildString {
+            if (where == null) {
+                append("SELECT $fieldStr FROM $table")
+            }else{
+                append("SELECT $fieldStr FROM $table WHERE ${where?.toSQLString()} $operationsStr".trim())
+            }
+            if (orderBy != null) {
+                append(" ")
+                append(orderBy!!.asString())
+            }
+            if (limit != null) {
+                append(" ")
+                append(limit!!.asString())
+            }
+        }
+    }
 
     /**
      * Appends an ORDER BY clause to the entire UNION query.
@@ -179,6 +213,16 @@ class QuerySelect private constructor(
         private var fields: List<String> = listOf("*")
         private var orderBy: OrderBy? = null
         private var limit: Limit? = null
+
+        /**
+         * Clears all logical operations and the main WHERE clause from the query.
+         * @return The current `QuerySelect` instance for chaining.
+         */
+        fun clear(): QueryBuilder {
+            operations.clear()
+            where = null
+            return this
+        }
 
         /**
          * Adds an AND condition to the WHERE clause.
@@ -301,6 +345,7 @@ class QuerySelect private constructor(
             this.orderBy = orderBy
             return this
         }
+
         fun getOrderBy(): OrderBy? {
             return this.orderBy
         }
