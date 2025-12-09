@@ -6,18 +6,23 @@ package com.blipblipcode.query.operator
  */
 data class Limit(
     val count: Int,
-    val offset: Int? = null
-) {
+    val offset: Int? = null,
+): SQLOperator<Int>{
+
+    override val symbol: String = "LIMIT"
+    override val column: String = ""
+    override val value: Int = count
+    override val caseConversion: CaseConversion = CaseConversion.NONE
 
     /**
      * Returns the SQL string representation of the LIMIT clause.
      * @return The LIMIT clause as a SQL string.
      */
-    fun asString(): String {
+    override fun asString(): String {
         return if (offset != null && offset != 0) {
-            "LIMIT $count OFFSET $offset"
+            "$symbol $count OFFSET $offset"
         } else {
-            "LIMIT $count"
+            "$symbol $count"
         }
     }
 

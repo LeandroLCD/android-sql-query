@@ -103,7 +103,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString()) }
+            val list = value.joinToString(", ") {
+                "'${caseConversion.asSqlFunction(it.toString())}'"
+            }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
@@ -115,27 +117,29 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<List<T>> {
         override val symbol: String = "NOT IN"
         override fun toSQLString(): String {
-            val list = value.joinToString(", ") { caseConversion.asSqlFunction(it.toString())}
+            val list = value.joinToString(", ") {
+                "'${caseConversion.asSqlFunction(it.toString())}'"
+            }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
     }
 
     /** Represents an "IS NULL" operation. */
-    data class IsNull(override val column: String) : SQLOperator<Unit> {
+    data class IsNull(override val column: String) : SQLOperator<String?> {
         override val symbol: String = "IS NULL"
-        override val value: Unit = Unit
+        override val value = null
         override val caseConversion: CaseConversion = CaseConversion.NONE
-        override fun toSQLString(): String = "$column $symbol"
-        override fun asString(): String = "$column $symbol"
+        override fun toSQLString(): String = "${caseConversion.asSqlFunction(column)} $symbol"
+        override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol"
     }
 
     /** Represents an "IS NOT NULL" operation. */
-    data class IsNotNull(override val column: String) : SQLOperator<Unit> {
+    data class IsNotNull(override val column: String) : SQLOperator<String?> {
         override val symbol: String = "IS NOT NULL"
-        override val value: Unit = Unit
+        override val value = null
         override val caseConversion: CaseConversion = CaseConversion.NONE
-        override fun toSQLString(): String = "$column $symbol"
-        override fun asString(): String = "$column $symbol"
+        override fun toSQLString(): String = "${caseConversion.asSqlFunction(column)}  $symbol"
+        override fun asString(): String = "${caseConversion.asSqlFunction(column)}  $symbol"
     }
 
     /** Represents a "BETWEEN" operation. */

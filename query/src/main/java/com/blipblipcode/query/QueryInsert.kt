@@ -84,6 +84,19 @@ class QueryInsert private constructor(
     }
 
     /**
+     * Generates the SQL string for the INSERT statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete INSERT SQL query as a string.
+     * @throws IllegalArgumentException if no fields are provided for insertion.
+     */
+    override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
+        require(fields.isNotEmpty()) { "At least one field must be provided for insertion." }
+        val columns = fields.values.filter { predicate(it) }.joinToString(", ") { it.name }
+        val values = fields.values.filter { predicate(it) }.joinToString(", ") { it.valueString() }
+        return "INSERT INTO $table ($columns) VALUES ($values)"
+    }
+
+    /**
      * A builder for creating `QueryInsert` instances.
      * This class provides a fluent API to construct an INSERT query.
      */

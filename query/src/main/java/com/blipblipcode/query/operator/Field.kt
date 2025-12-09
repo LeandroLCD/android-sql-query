@@ -10,8 +10,12 @@ package com.blipblipcode.query.operator
  */
 data class Field<T>(
     val name: String,
-    val value: T?,
-){
+    override val value: T,
+): SQLOperator<T>{
+
+    override val symbol: String= "="
+    override val column: String = name
+    override val caseConversion: CaseConversion = CaseConversion.NONE
     init {
         require(name.isNotBlank()) { "Field name cannot be blank" }
 
@@ -21,9 +25,9 @@ data class Field<T>(
      * It correctly formats the value based on its type (e.g., quoting strings).
      * @return A SQL assignment string.
      */
-    fun asString(): String{
+    override fun asString(): String{
         val valueStr = valueString()
-        return "$name = $valueStr"
+        return "$name $symbol $valueStr"
     }
 
     /**

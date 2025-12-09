@@ -32,4 +32,11 @@ interface Queryable {
      * @return The SQL query string.
      */
     fun asSql(): String
+
+    /**
+     * Returns the SQL query string representation of the object.
+     * @param predicate The predicate to filter the operators.
+     * @return The SQL query string.
+     */
+    fun asSql(predicate: ( SQLOperator<*>) -> Boolean): String
 }

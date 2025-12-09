@@ -96,6 +96,16 @@ class QueryUpdate private constructor(
     }
 
     /**
+     * Generates the SQL string for the UPDATE statement.
+     * @param predicate The predicate to filter the operators.
+     * @return The complete UPDATE SQL query as a string.
+     */
+    override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
+        val setClause = fields.values.filter { predicate(it) }.joinToString(", ") { it.asString() }
+        return "UPDATE $table SET $setClause WHERE ${where.toSQLString()}".trim()
+    }
+
+    /**
      * A builder for creating `QueryUpdate` instances.
      * This class provides a fluent API to construct an UPDATE query.
      */

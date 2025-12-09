@@ -6,6 +6,7 @@ import com.blipblipcode.query.InnerJoint
 import com.blipblipcode.query.QuerySelect
 import com.blipblipcode.query.Queryable
 import com.blipblipcode.query.UnionQuery
+import com.blipblipcode.query.retrofit.RepeatedQueryParameters
 
 /**
  * Creates an `InnerJoint` by joining this `QuerySelect` with another one.
@@ -85,4 +86,23 @@ fun UnionQuery.addQuery(query: QuerySelect): UnionQuery {
         .addQuery(query)
         .apply { if (this@addQuery.useUnionAll) unionAll() else union() }
         .build()
+}
+
+fun Queryable.asQueryRepeatedQueryParameters(predicate:(Pair<String, Any?>) -> Boolean = {true}):RepeatedQueryParameters{
+    return getSqlOperators()
+        .map { it.toPair() }
+        .fold(RepeatedQueryParameters.empty()) { acc, filter ->
+            when {
+                predicate.invoke(filter) && filter.second != null ->{
+                    if(filter.second is List<*>){
+                        acc.addRepeatedParameter(filter.first, filter.second as List<*>)
+                    }else{
+                        acc.addParameter(filter.first, filter.second!!)
+                    }
+                    acc
+                }
+
+                else -> acc
+            }
+        }
 }
