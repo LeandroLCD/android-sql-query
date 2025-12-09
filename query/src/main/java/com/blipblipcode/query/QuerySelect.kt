@@ -347,10 +347,10 @@ class QuerySelect private constructor(
             this.orderBy = orderBy
             return this
         }
-        fun getOrderBy(): OrderBy? {
-            return this.orderBy
-        }
-
+        /**
+         * Returns the ORDER BY clause for the query.
+         * @return The OrderBy object, or null if not set.
+         */
         fun getOrderBy(): OrderBy? {
             return this.orderBy
         }
