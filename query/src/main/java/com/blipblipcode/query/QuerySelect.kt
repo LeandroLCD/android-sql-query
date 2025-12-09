@@ -347,6 +347,9 @@ class QuerySelect private constructor(
             this.orderBy = orderBy
             return this
         }
+        fun getOrderBy(): OrderBy? {
+            return this.orderBy
+        }
 
         fun getOrderBy(): OrderBy? {
             return this.orderBy
