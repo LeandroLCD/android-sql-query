@@ -176,3 +176,22 @@ class UnionQuery private constructor(
         }
     }
 }
+fun main() {
+    // Example usage:
+    val query1 = QuerySelect.builder("users")
+        .where(SQLOperator.Equals("age", 30))
+        .and(SQLOperator.Equals("id", 30)).orderBy(
+        OrderBy.Asc("name")).build()
+    val query2 = QuerySelect.builder("admins")
+        .where(SQLOperator.Equals("edad", 30))
+        .and(SQLOperator.Equals("ege", 30))
+        .limit(10)
+        .orderBy(OrderBy.Desc("id")).build()
+
+    val unionQuery = UnionQuery.builder(query1)
+        .addQuery(query2)
+        .unionAll()
+        .build()
+
+    println(unionQuery.asSql())
+}

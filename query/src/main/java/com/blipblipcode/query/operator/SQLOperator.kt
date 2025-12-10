@@ -152,8 +152,8 @@ sealed interface SQLOperator<T> {
         override fun toSQLString(): String {
             val startStr = caseConversion.asSqlFunction(start.toString())
             val endStr = caseConversion.asSqlFunction(end.toString())
-            return "${caseConversion.asSqlFunction(column)} $symbol $startStr AND $endStr"
+            return "${caseConversion.asSqlFunction(column)} $symbol '$startStr' AND '$endStr'"
         }
-        override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction(start.toString())} AND ${caseConversion.asSqlFunction(start.toString())}"
+        override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol '${caseConversion.asSqlFunction(start.toString())}' AND '${caseConversion.asSqlFunction(start.toString())}'"
     }
 }
