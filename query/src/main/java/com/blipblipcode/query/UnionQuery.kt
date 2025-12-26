@@ -1,11 +1,8 @@
 package com.blipblipcode.query
 
-import com.blipblipcode.query.QuerySelect.QueryBuilder
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
-import kotlin.collections.set
 
 /**
  * Represents a SQL UNION query construct.
