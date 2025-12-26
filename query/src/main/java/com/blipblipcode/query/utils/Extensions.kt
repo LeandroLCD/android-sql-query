@@ -81,7 +81,7 @@ fun QuerySelect.unionAll(other: QuerySelect): UnionQuery {
  * @return A new `UnionQuery` instance containing the new query.
  */
 fun UnionQuery.addQuery(query: QuerySelect): UnionQuery {
-    return UnionQuery.Builder()
+    return UnionQuery.QueryBuilder()
         .addQueries(this.queries)
         .addQuery(query)
         .apply { if (this@addQuery.useUnionAll) unionAll() else union() }

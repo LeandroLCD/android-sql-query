@@ -1,7 +1,11 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.QuerySelect.QueryBuilder
+import com.blipblipcode.query.operator.LogicalOperation
+import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
+import kotlin.collections.set
 
 /**
  * Represents a SQL UNION query construct.
@@ -94,21 +98,55 @@ class UnionQuery private constructor(
     fun getOrderBy(): OrderBy? {
         return orderBy
     }
-
+    /**
+     * Creates a new `QueryBuilder` initialized with the current state of this `UnionQuery`.
+     * This allows for further modifications or additions to the existing union query.
+     *
+     * @param consumer A lambda that receives the `QueryBuilder` for further configuration.
+     * @return A new `QueryBuilder` instance initialized with the current queries and union type.
+     */
+    fun newBuilder(consumer:(QueryBuilder)-> Unit): QueryBuilder {
+        val builder = QueryBuilder()
+        builder.addQueries(queries)
+        if(useUnionAll){
+            builder.unionAll()
+        }else{
+            builder.union()
+        }
+        consumer(builder)
+        return builder
+    }
     /**
      * A builder for creating `UnionQuery` instances.
      * This class provides a fluent API to construct a UNION query.
      */
-    class Builder {
+    class QueryBuilder {
         private val queries = mutableListOf<QuerySelect>()
         private var useUnionAll = false
+
+
+        /**
+         * Transforms an existing logical operation by its key.
+         * @param key The key of the logical operation to transform.
+         * @param transform A lambda that takes the existing LogicalOperation and returns a new one.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun transformOperation(key:String, transform: (LogicalOperation) -> LogicalOperation): QueryBuilder {
+            queries.forEachIndexed { index, querySelect ->
+                val newQuery = querySelect.newBuilder { qb ->
+                    qb.transformOperation(key, transform)
+                }.build()
+                queries[index] = newQuery
+            }
+            return this
+        }
 
         /**
          * Adds a query to the union.
          * @param query The `QuerySelect` to add.
          * @return The `Builder` instance for chaining.
          */
-        fun addQuery(query: QuerySelect): Builder {
+        fun addQuery(query: QuerySelect): QueryBuilder {
             queries.add(query)
             return this
         }
@@ -118,7 +156,7 @@ class UnionQuery private constructor(
          * @param queries The list of `QuerySelect` objects to add.
          * @return The `Builder` instance for chaining.
          */
-        fun addQueries(queries: List<QuerySelect>): Builder {
+        fun addQueries(queries: List<QuerySelect>): QueryBuilder {
             this.queries.addAll(queries)
             return this
         }
@@ -127,7 +165,7 @@ class UnionQuery private constructor(
          * Sets the union type to UNION ALL.
          * @return The `Builder` instance for chaining.
          */
-        fun unionAll(): Builder {
+        fun unionAll(): QueryBuilder {
             useUnionAll = true
             return this
         }
@@ -136,7 +174,7 @@ class UnionQuery private constructor(
          * Sets the union type to UNION (default).
          * @return The `Builder` instance for chaining.
          */
-        fun union(): Builder {
+        fun union(): QueryBuilder {
             useUnionAll = false
             return this
         }
@@ -158,8 +196,8 @@ class UnionQuery private constructor(
          * @param baseQuery The first `QuerySelect` in the union.
          * @return A new `Builder` instance.
          */
-        fun builder(baseQuery: QuerySelect): Builder {
-            return Builder().also { builder ->
+        fun builder(baseQuery: QuerySelect): QueryBuilder {
+            return QueryBuilder().also { builder ->
                 builder.addQuery(baseQuery)
             }
         }
@@ -169,8 +207,8 @@ class UnionQuery private constructor(
          * @param baseQuery The first `QuerySelect` in the union.
          * @return A new `Builder` instance configured for UNION ALL.
          */
-        fun builderAll(baseQuery: QuerySelect): Builder {
-            return Builder().also { builder ->
+        fun builderAll(baseQuery: QuerySelect): QueryBuilder {
+            return QueryBuilder().also { builder ->
                 builder.addQuery(baseQuery).unionAll()
             }
         }
