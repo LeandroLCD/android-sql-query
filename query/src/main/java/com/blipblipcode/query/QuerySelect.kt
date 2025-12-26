@@ -17,7 +17,7 @@ import com.blipblipcode.query.operator.SQLOperator
  * @property fields The list of columns to be returned in the result set. Defaults to "*".
  */
 class QuerySelect private constructor(
-    private var where: SQLOperator<*>?,
+    private var where: Pair<String,SQLOperator<*>>?,
     private val table: String,
     private val operations: LinkedHashMap<String, LogicalOperation>,
     private val fields: List<String>
@@ -35,6 +35,21 @@ class QuerySelect private constructor(
             table: String
         ): QueryBuilder {
             return QueryBuilder(table, LinkedHashMap())
+        }
+    }
+    /**
+     * Creates a new `QueryBuilder` instance initialized with the current state of this `QuerySelect`.
+     * @param consumer A lambda that receives the `QueryBuilder` to customize the new query.
+     * @return A new `QueryBuilder` instance.
+     */
+    fun newBuilder(consumer:(QueryBuilder)-> Unit): QueryBuilder {
+        val builder = QueryBuilder(table, operations)
+        where?.let { builder.where(it.first, it.second) }
+        builder.setFields(*fields.toTypedArray())
+        orderBy?.let { builder.orderBy(it) }
+        limit?.let { builder.limit(it) }
+        return builder.apply {
+            consumer.invoke(this)
         }
     }
 
@@ -64,7 +79,15 @@ class QuerySelect private constructor(
      * @return The current `QuerySelect` instance for chaining.
      */
     fun setWhere(operator: SQLOperator<*>): QuerySelect {
-        where = operator
+        where = operator.column to operator
+        return this
+    }/**
+     * Sets or replaces the main WHERE clause of the query.
+     * @param operator The new SQL operator for the WHERE clause.
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun setWhere(key: String, operator: SQLOperator<*>): QuerySelect {
+        where = key to operator
         return this
     }
 
@@ -100,10 +123,17 @@ class QuerySelect private constructor(
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
-            where?.let { add(it) }
+            where?.let { add(it.second) }
             operations.values.forEach { add(it.operator) }
             orderBy?.let { add(it) }
             limit?.let { add(it) }
+        }
+    }
+
+    fun getOperations(): Map<String, SQLOperator<*>> {
+        return buildMap {
+            where?.let { put(it.first, it.second) }
+            operations.forEach { put(it.key, it.value.operator) }
         }
     }
 
@@ -126,7 +156,7 @@ class QuerySelect private constructor(
             if (where == null) {
                 append("SELECT $fieldStr FROM $table")
             }else{
-                append("SELECT $fieldStr FROM $table WHERE ${where?.toSQLString()} $operationsStr".trim())
+                append("SELECT $fieldStr FROM $table WHERE ${where?.second?.toSQLString()} $operationsStr".trim())
             }
             if (orderBy != null) {
                 append(" ")
@@ -150,7 +180,7 @@ class QuerySelect private constructor(
             if (where == null) {
                 append("SELECT $fieldStr FROM $table")
             }else{
-                append("SELECT $fieldStr FROM $table WHERE ${where?.toSQLString()} $operationsStr".trim())
+                append("SELECT $fieldStr FROM $table WHERE ${where?.second?.toSQLString()} $operationsStr".trim())
             }
             if (orderBy != null) {
                 append(" ")
@@ -211,7 +241,7 @@ class QuerySelect private constructor(
         private val table: String,
         private val operations: LinkedHashMap<String, LogicalOperation>
     ) {
-        private var where: SQLOperator<*>? = null
+        private var where: Pair<String, SQLOperator<*>>? = null
         private var fields: List<String> = listOf("*")
         private var orderBy: OrderBy? = null
         private var limit: Limit? = null
@@ -324,7 +354,17 @@ class QuerySelect private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun where(operator: SQLOperator<*>): QueryBuilder {
-            where = operator
+            where = operator.column to operator
+            return this
+        }
+
+        /**
+         * Sets the main WHERE clause for the query.
+         * @param operator The SQL operator for the WHERE clause.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun where(key: String, operator: SQLOperator<*>): QueryBuilder {
+            where = key to operator
             return this
         }
 
@@ -376,6 +416,27 @@ class QuerySelect private constructor(
             return this
         }
 
+        /**
+         * Transforms an existing logical operation by its key.
+         * @param key The key of the logical operation to transform.
+         * @param transform A lambda that takes the existing LogicalOperation and returns a new one.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun transformOperation(key:String, transform: (LogicalOperation) -> LogicalOperation): QueryBuilder {
+            when {
+                operations.containsKey(key) -> {
+                    val operator = operations[key]
+                    val newOperations = transform(operator!!)
+                    operations[key] = newOperations
+                }
+                where?.first == key -> {
+                    val newOperations = transform(LogicalOperation(LogicalType.AND, where!!.second))
+                    where = where?.copy(second = newOperations.operator)
+                }
+                else -> Unit
+            }
+            return this
+        }
         /**
          * Builds the `QuerySelect` instance.
          * @return A new `QuerySelect` object.
