@@ -498,24 +498,3 @@ class QuerySelect private constructor(
         }
     }
 }
-
-fun main() {
-    val query = QuerySelect.builder("users")
-        .where("status", SQLOperator.In("status", listOf(1, 5)))
-        .limit(10)
-        .build()
-    val newQuery = query.newBuilder { builder ->
-        builder.transformOperation("status") { op ->
-            LogicalOperation.Multiple(
-                listOf(
-                    op,
-                    LogicalOperation.Or(SQLOperator.Equals("status", 3))
-                ),
-                "WHERE"
-            )
-        }
-    }.build()
-
-    println(newQuery.asSql())
-
-}

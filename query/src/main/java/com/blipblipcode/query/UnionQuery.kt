@@ -160,22 +160,6 @@ class UnionQuery private constructor(
             return this
         }
 
-                /**
-         * Transforms an existing logical operation by its key.
-         * @param key The key of the logical operation to transform.
-         * @param transform A lambda that takes the existing LogicalOperation and returns a new one.
-         * @return The `QueryBuilder` instance for chaining.
-         */
-        fun transformOperation(key:String, transform: (LogicalOperation) -> LogicalOperation): QueryBuilder {
-            queries.forEachIndexed { index, querySelect ->
-                val newQuery = querySelect.newBuilder { qb ->
-                    qb.transformOperation(key, transform)
-                }.build()
-                queries[index] = newQuery
-            }
-            return this
-        }
-
         /**
          * Adds a query to the union.
          * @param query The `QuerySelect` to add.
