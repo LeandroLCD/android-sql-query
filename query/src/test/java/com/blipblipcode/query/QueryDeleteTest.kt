@@ -78,7 +78,7 @@ class QueryDeleteTest {
             .where(SQLOperator.Equals("id", 1))
             .build()
 
-        query.addLogicalOperation("status", LogicalOperation(LogicalType.AND, SQLOperator.Equals("status", "inactive")))
+        query.addLogicalOperation("status", LogicalOperation.And( SQLOperator.Equals("status", "inactive")))
 
         val expectedSql = "DELETE FROM users WHERE id = 1 AND status = 'inactive'"
         assertEquals(expectedSql, query.asSql())

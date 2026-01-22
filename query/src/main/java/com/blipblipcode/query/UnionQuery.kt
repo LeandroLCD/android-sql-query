@@ -26,7 +26,7 @@ class UnionQuery private constructor(
     }
 
     override fun getSqlOperation(key: String): SQLOperator<*>? {
-        return queries.flatMap { it.getSqlOperators() }.firstOrNull { it.column.equals(key, ignoreCase = true) }
+        return queries.map { it.getSqlOperation(key) }.firstOrNull()
     }
 
     /**
@@ -121,8 +121,29 @@ class UnionQuery private constructor(
         private val queries = mutableListOf<QuerySelect>()
         private var useUnionAll = false
 
+        /**
+         * Retrieves the current SQL operator for a given key.
+         * @param key The key of the SQL operator to retrieve.
+         * @return The `SQLOperator` if found, otherwise null.
+         */
+        fun getSqlOperation(key: String): SQLOperator<*>? {
+            return queries.map { it.getSqlOperation(key) }.firstOrNull()
+        }
 
         /**
+         * Adds a logical operation to all queries in the union.
+         * @param key The key for the logical operation.
+         * @param operation The `LogicalOperation` to add.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun addLogicalOperation(key: String, operation: LogicalOperation):QueryBuilder{
+            queries.forEach {
+                it.addLogicalOperation(key, operation)
+            }
+            return this
+        }
+
+                /**
          * Transforms an existing logical operation by its key.
          * @param key The key of the logical operation to transform.
          * @param transform A lambda that takes the existing LogicalOperation and returns a new one.
@@ -210,23 +231,4 @@ class UnionQuery private constructor(
             }
         }
     }
-}
-fun main() {
-    // Example usage:
-    val query1 = QuerySelect.builder("users")
-        .where(SQLOperator.Equals("age", 30))
-        .and(SQLOperator.Equals("id", 30)).orderBy(
-        OrderBy.Asc("name")).build()
-    val query2 = QuerySelect.builder("admins")
-        .where(SQLOperator.Equals("edad", 30))
-        .and(SQLOperator.Equals("ege", 30))
-        .limit(10)
-        .orderBy(OrderBy.Desc("id")).build()
-
-    val unionQuery = UnionQuery.builder(query1)
-        .addQuery(query2)
-        .unionAll()
-        .build()
-
-    println(unionQuery.asSql())
 }

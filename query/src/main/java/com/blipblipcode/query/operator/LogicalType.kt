@@ -4,6 +4,7 @@ package com.blipblipcode.query.operator
  * Defines the types of logical operations that can be used in a SQL WHERE clause.
  */
 enum class LogicalType(val sql: String) {
+    WHERE("WHERE"),
     /** Represents a logical AND operation. */
     AND("AND"),
     /** Represents a logical OR operation. */
