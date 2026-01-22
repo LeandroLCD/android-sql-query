@@ -2,7 +2,6 @@ package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.CaseConversion
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery

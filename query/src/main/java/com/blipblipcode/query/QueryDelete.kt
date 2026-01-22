@@ -1,8 +1,6 @@
 package com.blipblipcode.query
 
-import android.provider.Telephony
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
 
 /**

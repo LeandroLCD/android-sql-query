@@ -1,7 +1,6 @@
 package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
 import org.junit.Assert.assertEquals
