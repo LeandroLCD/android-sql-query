@@ -258,7 +258,7 @@ class QuerySelect private constructor(
          * @return The `SQLOperator` if found, otherwise null.
          */
         fun getSqlOperation(key: String): SQLOperator<*>? {
-            return operations.get(key)?.operator
+            return operations[key]?.operator
         }
 
         /**
