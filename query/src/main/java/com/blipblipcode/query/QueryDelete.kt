@@ -1,7 +1,6 @@
 package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
 
 /**
@@ -14,7 +13,7 @@ import com.blipblipcode.query.operator.SQLOperator
  * @property operations A map of logical operations (AND, OR, etc.) to be appended to the WHERE clause.
  */
 class QueryDelete private constructor(
-    private var where: SQLOperator<*>?,
+    private var where: Pair<String, LogicalOperation>?,
     private val table: String,
     private val operations: LinkedHashMap<String, LogicalOperation>,
 ):Queryable {
@@ -54,7 +53,7 @@ class QueryDelete private constructor(
      * @return The current `QueryDelete` instance for chaining.
      */
     fun setWhere(operator: SQLOperator<*>): QueryDelete {
-        where = operator
+        where = operator.column to LogicalOperation.Where(operator)
         return this
     }
 
@@ -72,7 +71,7 @@ class QueryDelete private constructor(
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
             require(where != null) { "A WHERE clause must be specified." }
-            add(where!!)
+            add(where!!.second.operator)
             operations.values.forEach { add(it.operator) }
         }
     }
@@ -92,7 +91,7 @@ class QueryDelete private constructor(
      */
     override fun asSql(): String {
         require(where != null) { "A WHERE clause must be specified." }
-        return "DELETE FROM $table WHERE ${where!!.toSQLString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
+        return "DELETE FROM $table ${where!!.second.asString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
     }
 
     /**
@@ -103,7 +102,7 @@ class QueryDelete private constructor(
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         require(where != null) { "A WHERE clause must be specified." }
-        return "DELETE FROM $table WHERE ${where!!.toSQLString()} ${operations.values.filter { predicate(it.operator) }.joinToString(" ") { it.asString() }}".trim()
+        return "DELETE FROM $table ${where!!.second.asString()} ${operations.values.filter { predicate(it.operator) }.joinToString(" ") { it.asString() }}".trim()
     }
 
     /**
@@ -113,7 +112,7 @@ class QueryDelete private constructor(
     class QueryBuilder internal constructor(
         private val table: String, private val operations: LinkedHashMap<String, LogicalOperation>
     ) {
-        private var where: SQLOperator<*>? = null
+        private var where: Pair<String, LogicalOperation>? = null
 
         /**
          * Clears all conditions and resets the builder.
@@ -132,7 +131,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun and(key: String, operator: SQLOperator<*>): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.AND, operator)
+            operations[key] = LogicalOperation.And(operator)
             return this
         }
         /**
@@ -141,7 +140,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun and(operator: SQLOperator<*>): QueryBuilder {
-            operations[operator.column] = LogicalOperation(LogicalType.AND, operator)
+            operations[operator.column] = LogicalOperation.And(operator)
             return this
         }
 
@@ -151,7 +150,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun andNot(operator: SQLOperator<*>): QueryBuilder {
-            operations[operator.column] = LogicalOperation(LogicalType.AND_NOT, operator)
+            operations[operator.column] = LogicalOperation.And(operator)
             return this
         }
 
@@ -161,7 +160,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun exists(operator: SQLOperator<*>): QueryBuilder {
-            operations[operator.column] = LogicalOperation(LogicalType.EXISTS, operator)
+            operations[operator.column] = LogicalOperation.Exists( operator)
             return this
         }
 
@@ -171,7 +170,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun not(operator: SQLOperator<*>): QueryBuilder {
-            operations[operator.column] = LogicalOperation(LogicalType.NOT, operator)
+            operations[operator.column] = LogicalOperation.Not(operator)
             return this
         }
 
@@ -182,7 +181,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun or(key: String, operator: SQLOperator<*>): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.OR, operator)
+            operations[key] = LogicalOperation.Or(operator)
             return this
         }
 
@@ -193,7 +192,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun like(key: String, operator: SQLOperator.Like): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.AND, operator)
+            operations[key] = LogicalOperation.And( operator)
             return this
         }
 
@@ -204,7 +203,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun all(key: String, operator: SQLOperator<*>): QueryBuilder {
-            operations[key] = LogicalOperation(LogicalType.ALL, operator)
+            operations[key] = LogicalOperation.All(operator)
             return this
         }
 
@@ -224,7 +223,7 @@ class QueryDelete private constructor(
          * @return The `QueryBuilder` instance for chaining.
          */
         fun where(operator: SQLOperator<*>): QueryBuilder {
-            where = operator
+            where = operator.column to LogicalOperation.Where(operator)
             return this
         }
 

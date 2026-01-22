@@ -1,7 +1,6 @@
 package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
 import org.junit.Assert.assertEquals
@@ -78,7 +77,7 @@ class QueryDeleteTest {
             .where(SQLOperator.Equals("id", 1))
             .build()
 
-        query.addLogicalOperation("status", LogicalOperation(LogicalType.AND, SQLOperator.Equals("status", "inactive")))
+        query.addLogicalOperation("status", LogicalOperation.And( SQLOperator.Equals("status", "inactive")))
 
         val expectedSql = "DELETE FROM users WHERE id = 1 AND status = 'inactive'"
         assertEquals(expectedSql, query.asSql())

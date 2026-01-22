@@ -26,7 +26,7 @@ class UnionQuery private constructor(
     }
 
     override fun getSqlOperation(key: String): SQLOperator<*>? {
-        return queries.flatMap { it.getSqlOperators() }.firstOrNull { it.column.equals(key, ignoreCase = true) }
+        return queries.map { it.getSqlOperation(key) }.firstOrNull()
     }
 
     /**
@@ -134,6 +134,28 @@ class UnionQuery private constructor(
                     qb.transformOperation(key, transform)
                 }.build()
                 queries[index] = newQuery
+            }
+            return this
+        }
+
+        /**
+         * Retrieves the current SQL operator for a given key.
+         * @param key The key of the SQL operator to retrieve.
+         * @return The `SQLOperator` if found, otherwise null.
+         */
+        fun getSqlOperation(key: String): SQLOperator<*>? {
+            return queries.map { it.getSqlOperation(key) }.firstOrNull()
+        }
+
+        /**
+         * Adds a logical operation to all queries in the union.
+         * @param key The key for the logical operation.
+         * @param operation The `LogicalOperation` to add.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun addLogicalOperation(key: String, operation: LogicalOperation):QueryBuilder{
+            queries.forEach {
+                it.addLogicalOperation(key, operation)
             }
             return this
         }

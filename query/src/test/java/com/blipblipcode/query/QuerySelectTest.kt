@@ -2,7 +2,6 @@ package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.CaseConversion
 import com.blipblipcode.query.operator.LogicalOperation
-import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
@@ -97,7 +96,7 @@ class QuerySelectTest {
         val query = QuerySelect.builder("users")
             .where(SQLOperator.Equals("id", 1))
             .build()
-        query.addLogicalOperation("status", LogicalOperation(LogicalType.AND, SQLOperator.Equals("status", "active")))
+        query.addLogicalOperation("status", LogicalOperation.And(SQLOperator.Equals("status", "active")))
         val expectedSql = "SELECT * FROM users WHERE id = 1 AND status = 'active'"
         assertEquals(expectedSql, query.asSql())
     }
@@ -108,7 +107,7 @@ class QuerySelectTest {
             .where(SQLOperator.Equals("id", 1))
             .and("status", SQLOperator.Equals("status", "inactive"))
             .build()
-        query.addLogicalOperation("status", LogicalOperation(LogicalType.AND, SQLOperator.Equals("status", "active")))
+        query.addLogicalOperation("status", LogicalOperation.And(SQLOperator.Equals("status", "active")))
         val expectedSql = "SELECT * FROM users WHERE id = 1 AND status = 'active'"
         assertEquals(expectedSql, query.asSql())
     }
@@ -118,7 +117,7 @@ class QuerySelectTest {
         val query = QuerySelect.builder("users")
             .where(SQLOperator.Equals("id", 1))
             .build()
-        query.addLogicalOperation("", LogicalOperation(LogicalType.AND, SQLOperator.Equals("status", "active")))
+        query.addLogicalOperation("", LogicalOperation.And(SQLOperator.Equals("status", "active")))
         val expectedSql = "SELECT * FROM users WHERE id = 1 AND status = 'active'"
         assertEquals(expectedSql, query.asSql())
     }
@@ -128,7 +127,7 @@ class QuerySelectTest {
         val query = QuerySelect.builder("users")
             .where(SQLOperator.Equals("id", 1))
             .build()
-            .addLogicalOperation("age", LogicalOperation(LogicalType.OR, SQLOperator.GreaterThan("age", 30)))
+            .addLogicalOperation("age", LogicalOperation.Or(SQLOperator.GreaterThan("age", 30)))
         val expectedSql = "SELECT * FROM users WHERE id = 1 OR age > 30"
         assertEquals(expectedSql, query.asSql())
     }
