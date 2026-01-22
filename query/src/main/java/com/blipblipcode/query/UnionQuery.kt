@@ -121,6 +121,23 @@ class UnionQuery private constructor(
         private val queries = mutableListOf<QuerySelect>()
         private var useUnionAll = false
 
+
+        /**
+         * Transforms an existing logical operation by its key.
+         * @param key The key of the logical operation to transform.
+         * @param transform A lambda that takes the existing LogicalOperation and returns a new one.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun transformOperation(key:String, transform: (LogicalOperation) -> LogicalOperation): QueryBuilder {
+            queries.forEachIndexed { index, querySelect ->
+                val newQuery = querySelect.newBuilder { qb ->
+                    qb.transformOperation(key, transform)
+                }.build()
+                queries[index] = newQuery
+            }
+            return this
+        }
+
         /**
          * Retrieves the current SQL operator for a given key.
          * @param key The key of the SQL operator to retrieve.
@@ -231,4 +248,23 @@ class UnionQuery private constructor(
             }
         }
     }
+}
+fun main() {
+    // Example usage:
+    val query1 = QuerySelect.builder("users")
+        .where(SQLOperator.Equals("age", 30))
+        .and(SQLOperator.Equals("id", 30)).orderBy(
+        OrderBy.Asc("name")).build()
+    val query2 = QuerySelect.builder("admins")
+        .where(SQLOperator.Equals("edad", 30))
+        .and(SQLOperator.Equals("ege", 30))
+        .limit(10)
+        .orderBy(OrderBy.Desc("id")).build()
+
+    val unionQuery = UnionQuery.builder(query1)
+        .addQuery(query2)
+        .unionAll()
+        .build()
+
+    println(unionQuery.asSql())
 }

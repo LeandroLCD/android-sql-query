@@ -36,6 +36,21 @@ class QuerySelect private constructor(
             return QueryBuilder(table, LinkedHashMap())
         }
     }
+    /**
+     * Creates a new `QueryBuilder` instance initialized with the current state of this `QuerySelect`.
+     * @param consumer A lambda that receives the `QueryBuilder` to customize the new query.
+     * @return A new `QueryBuilder` instance.
+     */
+    fun newBuilder(consumer:(QueryBuilder)-> Unit): QueryBuilder {
+        val builder = QueryBuilder(table, operations)
+        where?.let { builder.where(it.first, it.second) }
+        builder.setFields(*fields.toTypedArray())
+        orderBy?.let { builder.orderBy(it) }
+        limit?.let { builder.limit(it) }
+        return builder.apply {
+            consumer.invoke(this)
+        }
+    }
 
     /**
      * Creates a new `QueryBuilder` instance initialized with the current state of this `QuerySelect`.
