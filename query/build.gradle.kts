@@ -1,8 +1,11 @@
+import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.kotlin.dsl.publishing
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    `maven-publish`
 }
 
 android {
@@ -36,6 +39,37 @@ android {
             jvmTarget = JvmTarget.JVM_17
         }
     }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+}
+
+
+publishing {
+    publications {
+        create<MavenPublication>("release") {
+            groupId = "com.github.LeandroLCD"
+            artifactId = "query"
+            version = project.version.toString()
+        }
+    }
+}
+
+afterEvaluate {
+    val releaseComponent = components.findByName("release")
+    if (releaseComponent != null) {
+        publishing {
+            publications {
+                val pub = getByName("release") as MavenPublication
+                pub.from(releaseComponent)
+            }
+        }
+    } else {
+        logger.warn("Android 'release' component not found; maven publication won't include component artifacts.")
+    }
 }
 
 dependencies {
@@ -58,5 +92,3 @@ tasks.register("runQueryUnitTests") {
         println("✅ Tests unitarios del módulo query completados")
     }
 }
-
-
