@@ -70,6 +70,8 @@ class QuerySelect private constructor(
     fun clear(): QuerySelect {
         operations.clear()
         where = null
+        limit = null
+        orderBy = null
         return this
     }
 
