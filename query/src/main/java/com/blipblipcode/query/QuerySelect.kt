@@ -137,6 +137,8 @@ class QuerySelect private constructor(
     fun getOperations(): Map<String, SQLOperator<*>> {
         return buildMap {
             where?.let { put(it.first, it.second.operator) }
+            limit?.let { put("limit", it) }
+            orderBy?.let { put("orderBy", it) }
             operations.forEach { put(it.key, it.value.operator) }
         }
     }
@@ -238,6 +240,10 @@ class QuerySelect private constructor(
 
     fun getOrderBy(): OrderBy? {
         return this.orderBy
+    }
+
+    fun getLimit(): Limit? {
+        return this.limit
     }
 
 
