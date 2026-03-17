@@ -134,6 +134,10 @@ class QuerySelect private constructor(
         }
     }
 
+    fun getOperators(): List<SQLOperator<*>> {
+        return operations.values.map { it.operator }
+    }
+
     fun getOperations(): Map<String, SQLOperator<*>> {
         return buildMap {
             where?.let { put(it.first, it.second.operator) }
@@ -214,6 +218,12 @@ class QuerySelect private constructor(
         orderBy = operator
         return this
     }
+
+    fun clearOrderBy(): Queryable {
+        orderBy = null
+        return this
+    }
+
 
     /**
      * Adds a LIMIT clause to the query to limit the number of rows returned.

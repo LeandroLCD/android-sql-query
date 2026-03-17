@@ -95,6 +95,11 @@ class UnionQuery private constructor(
     fun getOrderBy(): OrderBy? {
         return orderBy
     }
+
+    fun clearOrderBy(): Queryable {
+        orderBy = null
+        return this
+    }
     /**
      * Creates a new `QueryBuilder` initialized with the current state of this `UnionQuery`.
      * This allows for further modifications or additions to the existing union query.
