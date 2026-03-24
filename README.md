@@ -100,6 +100,73 @@ val selectQuery = QuerySelect.builder("users")
     selectQuery.limit(10, 5) 
 
 val sqlString = selectQuery.asSql()
+
+### ⬆️ ORDER BY
+
+Para ordenar los resultados puedes utilizar el método `orderBy` con `OrderBy.Asc`, `OrderBy.Desc` o una lista mediante `OrderBy.Multiple`.
+
+`OrderBy.Asc` y `OrderBy.Desc` aceptan tres parámetros:
+
+| Parámetro   | Tipo                   | Descripción |
+|-------------|------------------------|-------------|
+| `column`    | `String`               | Nombre de la columna. |
+| `collation` | `Collation`            | Cláusula COLLATE que se añade **al final** de la expresión (por defecto `Collation.NONE`). |
+| `transform` | `(String) -> String`   | Función que envuelve la columna en SQL arbitrario (REPLACE, LOWER, etc.). Se aplica **antes** del COLLATE. Por defecto es la identidad `{ it }`. |
+
+```kotlin
+// ORDER BY simple asc
+val q1 = QuerySelect.builder("users")
+    .where(SQLOperator.Equals("status", "active"))
+    .build()
+q1.orderBy(OrderBy.Asc("name")) // -> ORDER BY name ASC
+
+// ORDER BY con múltiples columnas y direcciones mezcladas
+q1.orderBy(OrderBy.Multiple(listOf(
+    OrderBy.Asc("department"),
+    OrderBy.Desc("created_at")
+))) // -> ORDER BY department ASC, created_at DESC
+
+// ORDER BY usando Collation (ej: NOCASE o RTRIM)
+q1.orderBy(OrderBy.Asc("name", collation = Collation.NOCASE))
+// -> ORDER BY name COLLATE NOCASE ASC
+
+q1.orderBy(OrderBy.Desc("name", collation = Collation.RTRIM))
+// -> ORDER BY RTRIM(name) DESC
+```
+
+#### 🔄 Transform + Collation
+
+Usa `transform` para aplicar funciones SQL sobre la columna (como `REPLACE`) y `collation` para
+el `COLLATE`. El `transform` envuelve la columna **antes** de que se añada el COLLATE,
+garantizando SQL correcto como:
+
+```sql
+SELECT * FROM vehicle
+ORDER BY REPLACE(identification, '-', '') COLLATE NOCASE ASC
+```
+
+> **Nota:** En SQLite, `LOWER()` no garantiza un ordenamiento case-insensitive correcto.
+> Usa siempre `COLLATE NOCASE` para ignorar mayúsculas/minúsculas al ordenar.
+
+```kotlin
+// Eliminar guiones e ignorar mayúsculas/minúsculas
+val strip = "-".removeCharsTransform()   // extensión de CollationUtils
+q1.orderBy(OrderBy.Asc("identification", collation = Collation.NOCASE, transform = strip))
+// -> ORDER BY REPLACE(identification, '-', '') COLLATE NOCASE ASC
+
+// Solo COLLATE NOCASE (sin transform)
+q1.orderBy(OrderBy.Asc("name", collation = Collation.NOCASE))
+// -> ORDER BY name COLLATE NOCASE ASC
+
+// Quitar espacios, guiones y puntos + COLLATE NOCASE
+val stripChars = " -.".removeCharsTransform()
+q1.orderBy(OrderBy.Asc("name", collation = Collation.NOCASE, transform = stripChars))
+// -> ORDER BY REPLACE(REPLACE(REPLACE(name, ' ', ''), '-', ''), '.', '') COLLATE NOCASE ASC
+
+// Combinar RTRIM + NOCASE con transform
+val stripDash = "-".removeCharsTransform()
+q1.orderBy(OrderBy.Asc("code", collation = Collation.RTRIM and Collation.NOCASE, transform = stripDash))
+// -> ORDER BY RTRIM(REPLACE(code, '-', '')) COLLATE NOCASE ASC
 ```
 
 ### ➕ INSERT

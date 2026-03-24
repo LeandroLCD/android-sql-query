@@ -36,16 +36,17 @@ class UnionQuery private constructor(
      */
     override fun asSql(): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
-            query.getOrderBy()?.let { acc.add(it) }
-            query.orderBy(null)
-            acc
-        }
-        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
+        val orders = queries.mapNotNull { it.getOrderBy() }.toMutableList()
+        orderBy?.let { orders.add(it) }
+
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
-        
+
         return buildString {
-            append(queries.joinToString("\n$unionKeyword\n") { it.asSql() })
+            append("SELECT * FROM (")
+            appendLine()
+            append(queries.joinToString("\n$unionKeyword\n") { it.asSql { op -> op !is OrderBy } })
+            appendLine()
+            append(")")
             if (orders.isNotEmpty()) {
                 appendLine()
                 append(OrderBy.Multiple(orders).asString())
@@ -60,16 +61,19 @@ class UnionQuery private constructor(
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-        val orders = queries.fold(mutableListOf<OrderBy>()) { acc, query ->
-            query.getOrderBy()?.let { acc.add(it) }
-            query.orderBy(null)
-            acc
-        }
-        orders.addAll(orderBy?.let { listOf(it) } ?: emptyList())
+        val orders = queries.mapNotNull { it.getOrderBy()?.takeIf(predicate) }.toMutableList()
+        orderBy?.takeIf(predicate)?.let { orders.add(it) }
+
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
 
         return buildString {
-            append(queries.joinToString("\n$unionKeyword\n") { it.asSql(predicate) })
+            append("SELECT * FROM (")
+            this.appendLine()
+            append(queries.joinToString("\n$unionKeyword\n") { query ->
+                query.asSql { op -> predicate(op) && op !is OrderBy }
+            })
+            this.appendLine()
+            append(")")
             if (orders.isNotEmpty()) {
                 appendLine()
                 append(OrderBy.Multiple(orders).asString())
@@ -237,23 +241,4 @@ class UnionQuery private constructor(
             }
         }
     }
-}
-fun main() {
-    // Example usage:
-    val query1 = QuerySelect.builder("users")
-        .where(SQLOperator.Equals("age", 30))
-        .and(SQLOperator.Equals("id", 30)).orderBy(
-        OrderBy.Asc("name")).build()
-    val query2 = QuerySelect.builder("admins")
-        .where(SQLOperator.Equals("edad", 30))
-        .and(SQLOperator.Equals("ege", 30))
-        .limit(10)
-        .orderBy(OrderBy.Desc("id")).build()
-
-    val unionQuery = UnionQuery.builder(query1)
-        .addQuery(query2)
-        .unionAll()
-        .build()
-
-    println(unionQuery.asSql())
 }

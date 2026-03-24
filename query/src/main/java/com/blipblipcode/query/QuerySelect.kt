@@ -187,22 +187,23 @@ class QuerySelect private constructor(
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
+        val filteredWhere = where?.takeIf { predicate(it.second.operator) }
         val operationsStr =
             if (operations.isNotEmpty()) operations.values.filter { predicate(it.operator) }
                 .joinToString(" ") { it.asString() } else ""
         return buildString {
-            if (where == null) {
+            if (filteredWhere == null) {
                 append("SELECT $fieldStr FROM $table")
             } else {
-                append("SELECT $fieldStr FROM $table ${where?.second?.asString()} $operationsStr".trim())
+                append("SELECT $fieldStr FROM $table ${filteredWhere.second.asString()} $operationsStr".trim())
             }
-            if (orderBy != null) {
+            orderBy?.takeIf { predicate(it) }?.let {
                 append(" ")
-                append(orderBy!!.asString())
+                append(it.asString())
             }
-            if (limit != null) {
+            limit?.takeIf { predicate(it) }?.let {
                 append(" ")
-                append(limit!!.asString())
+                append(it.asString())
             }
         }
     }
