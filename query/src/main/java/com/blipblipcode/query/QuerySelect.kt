@@ -257,6 +257,15 @@ class QuerySelect private constructor(
         return this.limit
     }
 
+    /**
+     * Clears the LIMIT clause from the query.
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun clearLimit(): QuerySelect {
+        limit = null
+        return this
+    }
+
 
     /**
      * A builder for creating `QuerySelect` instances.

@@ -1,5 +1,6 @@
 package com.blipblipcode.query
 
+import com.blipblipcode.query.operator.Limit
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
@@ -31,13 +32,22 @@ class UnionQuery private constructor(
 
     /**
      * Generates the SQL string for the UNION statement.
+     *
+     * If an ORDER BY has been explicitly set on this `UnionQuery` (via [orderBy]),
+     * it will be used and any ORDER BY clauses from the individual queries will be ignored.
+     * If no ORDER BY has been set on this `UnionQuery`, the ORDER BY clauses from the
+     * individual queries will be collected and combined at the end of the UNION.
+     *
      * @return The complete UNION SQL query as a string.
      * @throws IllegalArgumentException if less than two queries are provided.
      */
     override fun asSql(): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-        val orders = queries.mapNotNull { it.getOrderBy() }.toMutableList()
-        orderBy?.let { orders.add(it) }
+        val orders = if (orderBy != null) {
+            listOf(orderBy!!)
+        } else {
+            queries.mapNotNull { it.getOrderBy() }
+        }
 
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
 
@@ -55,14 +65,24 @@ class UnionQuery private constructor(
     }
     /**
      * Generates the SQL string for the UNION statement.
+     *
+     * If an ORDER BY has been explicitly set on this `UnionQuery` (via [orderBy]),
+     * it will be used (if it passes the predicate) and any ORDER BY clauses from the
+     * individual queries will be ignored.
+     * If no ORDER BY has been set on this `UnionQuery`, the ORDER BY clauses from the
+     * individual queries that pass the predicate will be collected and combined at the end.
+     *
      * @param predicate The predicate to filter the operators.
      * @return The complete UNION SQL query as a string.
      * @throws IllegalArgumentException if less than two queries are provided.
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         require(queries.size >= 2) { "At least two queries are required for a UNION" }
-        val orders = queries.mapNotNull { it.getOrderBy()?.takeIf(predicate) }.toMutableList()
-        orderBy?.takeIf(predicate)?.let { orders.add(it) }
+        val orders = if (orderBy != null) {
+            listOfNotNull(orderBy?.takeIf(predicate))
+        } else {
+            queries.mapNotNull { it.getOrderBy()?.takeIf(predicate) }
+        }
 
         val unionKeyword = if (useUnionAll) "UNION ALL" else "UNION"
 
@@ -82,11 +102,14 @@ class UnionQuery private constructor(
     }
 
     /**
-     * Appends an ORDER BY clause to the entire UNION query.
-     * Note that in most SQL dialects, an ORDER BY clause can only be applied to the final result of a UNION, not to individual `SELECT` statements within it.
+     * Sets an ORDER BY clause for the entire UNION query.
+     * When set, this ORDER BY takes precedence and any ORDER BY clauses
+     * defined in the individual queries will be ignored.
+     * If not set (null), the ORDER BY clauses from the individual queries
+     * will be collected and combined at the end of the UNION statement.
      *
-     * @param operator A vararg of `OrderExpression` objects specifying the columns and direction for sorting.
-     * @return A new `QuerySelect` instance representing the UNION query with the added ORDER BY clause.
+     * @param operator The `OrderBy` object specifying the column and direction for sorting.
+     * @return This `UnionQuery` instance for chaining.
      */
     fun orderBy(operator: OrderBy): Queryable {
         orderBy = operator
@@ -102,6 +125,51 @@ class UnionQuery private constructor(
 
     fun clearOrderBy(): Queryable {
         orderBy = null
+        return this
+    }
+
+    /**
+     * Applies a LIMIT clause to all internal queries.
+     *
+     * @param count The maximum number of rows to return per query.
+     * @param offset The number of rows to skip before returning results (optional).
+     * @param override If true, replaces any existing LIMIT in each query.
+     *                 If false (default), only applies the LIMIT to queries that do not already have one.
+     * @return This `UnionQuery` instance for chaining.
+     */
+    fun limit(count: Int, offset: Int? = null, override: Boolean = false): UnionQuery {
+        queries.forEach { query ->
+            if (override || query.getLimit() == null) {
+                query.limit(count, offset)
+            }
+        }
+        return this
+    }
+
+    /**
+     * Applies a LIMIT clause to all internal queries using a [Limit] object.
+     *
+     * @param limitOperator The [Limit] object specifying the limit parameters.
+     * @param override If true, replaces any existing LIMIT in each query.
+     *                 If false (default), only applies the LIMIT to queries that do not already have one.
+     * @return This `UnionQuery` instance for chaining.
+     */
+    fun limit(limitOperator: Limit, override: Boolean = false): UnionQuery {
+        queries.forEach { query ->
+            if (override || query.getLimit() == null) {
+                query.limit(limitOperator)
+            }
+        }
+        return this
+    }
+
+    /**
+     * Removes the LIMIT clause from all internal queries.
+     *
+     * @return This `UnionQuery` instance for chaining.
+     */
+    fun clearLimit(): UnionQuery {
+        queries.forEach { it.clearLimit() }
         return this
     }
     /**
