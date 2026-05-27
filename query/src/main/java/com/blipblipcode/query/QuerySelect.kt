@@ -258,6 +258,28 @@ class QuerySelect private constructor(
     }
 
     /**
+     * Converts this [QuerySelect] into a [QueryDelete] targeting the same table and using the same
+     * WHERE and AND/OR conditions. Fields, ORDER BY and LIMIT are ignored since they are not
+     * applicable to DELETE statements.
+     *
+     * @return A [QueryDelete] instance with the same filters as this [QuerySelect].
+     * @throws IllegalArgumentException if this [QuerySelect] has no WHERE clause defined.
+     */
+    fun toQueryDelete(): QueryDelete {
+        require(where != null) { "QuerySelect must have a WHERE clause to be converted to QueryDelete" }
+
+        val deleteQuery = QueryDelete.builder(getTableName())
+            .where(where!!.second.operator)
+            .build()
+
+        operations.forEach { (key, operation) ->
+            deleteQuery.addLogicalOperation(key, operation)
+        }
+
+        return deleteQuery
+    }
+
+    /**
      * Clears the LIMIT clause from the query.
      * @return The current `QuerySelect` instance for chaining.
      */

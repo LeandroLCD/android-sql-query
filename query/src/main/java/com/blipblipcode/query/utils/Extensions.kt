@@ -3,6 +3,7 @@ package com.blipblipcode.query.utils
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.blipblipcode.query.InnerJoint
+import com.blipblipcode.query.QueryDelete
 import com.blipblipcode.query.QuerySelect
 import com.blipblipcode.query.Queryable
 import com.blipblipcode.query.UnionQuery
