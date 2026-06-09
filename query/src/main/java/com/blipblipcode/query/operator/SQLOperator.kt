@@ -1,8 +1,5 @@
 package com.blipblipcode.query.operator
 
-import kotlinx.coroutines.CopyableThrowable
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-
 /**
  * A sealed interface representing a SQL operator for use in WHERE clauses.
  * It defines the common properties of a SQL operator, such as the column, the value, and the symbol.
