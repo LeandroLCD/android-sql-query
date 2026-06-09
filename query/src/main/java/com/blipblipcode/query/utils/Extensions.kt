@@ -7,6 +7,20 @@ import com.blipblipcode.query.QueryDelete
 import com.blipblipcode.query.QuerySelect
 import com.blipblipcode.query.Queryable
 import com.blipblipcode.query.UnionQuery
+import com.blipblipcode.query.operator.Collation
+import com.blipblipcode.query.operator.LogicalOperation
+import com.blipblipcode.query.operator.LogicalOperation.All
+import com.blipblipcode.query.operator.LogicalOperation.And
+import com.blipblipcode.query.operator.LogicalOperation.AndNot
+import com.blipblipcode.query.operator.LogicalOperation.Exists
+import com.blipblipcode.query.operator.LogicalOperation.Multiple
+import com.blipblipcode.query.operator.LogicalOperation.Not
+import com.blipblipcode.query.operator.LogicalOperation.Or
+import com.blipblipcode.query.operator.LogicalOperation.Where
+import com.blipblipcode.query.operator.OrderBy
+import com.blipblipcode.query.operator.OrderBy.Asc
+import com.blipblipcode.query.operator.OrderBy.Desc
+import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.retrofit.RepeatedQueryParameters
 
 /**
@@ -106,4 +120,33 @@ fun Queryable.asQueryRepeatedQueryParameters(predicate:(Pair<String, Any?>) -> B
                 else -> acc
             }
         }
+}
+
+fun LogicalOperation.copy(operator: SQLOperator<*> = this.operator): LogicalOperation{
+    return when(this){
+        is All -> copy(operator = operator)
+        is And -> copy(operator = operator)
+        is AndNot -> copy(operator = operator)
+        is Exists -> copy( operator = operator)
+        is Multiple -> copy(operator = operator)
+        is Not -> copy(operator = operator)
+        is Or -> copy(operator = operator)
+        is Where -> copy(operator = operator)
+    }
+}
+
+fun OrderBy.copy(column: String = this.column, collation: Collation = this.collation, transform: (String) -> String = this.transform): OrderBy {
+    return when(this){
+        is Asc -> {
+            Asc(column, collation, transform)
+        }
+
+        is Desc -> {
+            Desc(column, collation, transform)
+        }
+
+        is OrderBy.Multiple -> {
+            OrderBy.Multiple(orders.map { it.copy(column, collation, transform) })
+        }
+    }
 }

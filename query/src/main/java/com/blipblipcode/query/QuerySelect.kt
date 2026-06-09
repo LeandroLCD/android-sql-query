@@ -45,8 +45,8 @@ class QuerySelect private constructor(
      */
     fun newBuilder(consumer: (QueryBuilder) -> Unit): QueryBuilder {
         val mOperations = LinkedHashMap<String, LogicalOperation>()
-        operations.map { (key, value) ->
-            operations[key] = value.clone()
+        operations.forEach { (key, value) ->
+            mOperations[key] = value.clone()
         }
         val builder = QueryBuilder(table, mOperations)
         where?.let { builder.where(it.first, it.second.clone()) }
@@ -358,6 +358,15 @@ class QuerySelect private constructor(
          */
         fun andNot(operator: SQLOperator<*>): QueryBuilder {
             operations[operator.column] = LogicalOperation.AndNot(operator)
+            return this
+        }
+        /**
+         * Adds an AND NOT logical operation to the query.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun andNot(key: String, operator: SQLOperator<*>): QueryBuilder {
+            operations[key] = LogicalOperation.AndNot(operator)
             return this
         }
 

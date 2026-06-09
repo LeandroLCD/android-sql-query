@@ -41,4 +41,8 @@ data class Field<T>(
             else -> value.toString()
         }
     }
+
+    override fun clone(): SQLOperator<T> {
+        return Field(name, value)
+    }
 }

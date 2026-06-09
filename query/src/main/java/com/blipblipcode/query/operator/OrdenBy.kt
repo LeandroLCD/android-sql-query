@@ -11,14 +11,14 @@ sealed interface OrderBy : SQLOperator<String> {
     val collation: Collation
     override fun asString(): String
 
+    override fun clone(): OrderBy
+
     fun asSqlClause(): String {
         return when (this) {
             is Asc, is Desc -> collation.apply(transform(column)) + " " + value
             is Multiple -> orders.joinToString(", ") { it.asSqlClause() }
         }
     }
-
-    fun clone(vararg params: Any?): OrderBy
 
     data class Asc(
         override val column: String,
@@ -33,12 +33,8 @@ sealed interface OrderBy : SQLOperator<String> {
             return "$symbol $expr $value"
         }
 
-        override fun clone(vararg params: Any?): OrderBy {
-            val newColumn = params.getOrNull(0) as? String ?: column
-            val newCollation = params.getOrNull(1) as? Collation ?: collation
-            @Suppress("UNCHECKED_CAST")
-            val newTransform = params.getOrNull(2) as? (String) -> String ?: transform
-            return this.copy(column = newColumn, transform = newTransform, collation = newCollation)
+        override fun clone(): OrderBy {
+            return this.copy()
         }
 
         override fun toString(): String = asString()
@@ -57,12 +53,8 @@ sealed interface OrderBy : SQLOperator<String> {
             return "$symbol $expr $value"
         }
 
-        override fun clone(vararg params: Any?): OrderBy {
-            val newColumn = params.getOrNull(0) as? String ?: column
-            val newCollation = params.getOrNull(1) as? Collation ?: collation
-            @Suppress("UNCHECKED_CAST")
-            val newTransform = params.getOrNull(2) as? (String) -> String ?: transform
-            return this.copy(column = newColumn, transform = newTransform, collation = newCollation)
+        override fun clone(): OrderBy {
+            return this.copy()
         }
 
         override fun toString(): String = asString()
@@ -80,15 +72,8 @@ sealed interface OrderBy : SQLOperator<String> {
             return "ORDER BY ${asSqlClause()}"
         }
 
-        override fun clone(vararg params: Any?): OrderBy {
-            val newOrders = params.getOrNull(0) as? List<*>
-                ?: return this.copy()
-
-            if (newOrders.all { it is OrderBy }) {
-                @Suppress("UNCHECKED_CAST")
-                return this.copy(orders = newOrders as List<OrderBy>)
-            }
-            throw IllegalArgumentException("The parameters provided for cloning are not of the List type<OrderBy>.")
+        override fun clone(): OrderBy {
+           return this.copy()
         }
 
         override fun toString(): String = "ORDER BY ${asSqlClause()}"
@@ -99,7 +84,7 @@ sealed interface OrderBy : SQLOperator<String> {
             return orders == other.orders
         }
 
-        override fun hashCode(): Int = orders.hashCode()
+        override fun hashCode(): Int = orders.hashCode() + 31 * symbol.hashCode()
     }
 
 }
