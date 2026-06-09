@@ -104,7 +104,7 @@ class UnionQuery private constructor(
      */
     fun newBuilder(consumer:(QueryBuilder)-> Unit): QueryBuilder {
         val builder = QueryBuilder()
-        builder.addQueries(queries)
+        builder.addQueries(queries.map { it.copy() })
         if(useUnionAll){
             builder.unionAll()
         }else{
@@ -113,6 +113,11 @@ class UnionQuery private constructor(
         consumer(builder)
         return builder
     }
+
+    fun copy(): UnionQuery {
+        return newBuilder {  }.build()
+    }
+
     /**
      * A builder for creating `UnionQuery` instances.
      * This class provides a fluent API to construct a UNION query.

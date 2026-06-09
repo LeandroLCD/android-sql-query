@@ -43,14 +43,22 @@ class QuerySelect private constructor(
      * @return A new `QueryBuilder` instance.
      */
     fun newBuilder(consumer: (QueryBuilder) -> Unit): QueryBuilder {
-        val builder = QueryBuilder(table, operations)
-        where?.let { builder.where(it.first, it.second) }
+        val mOperations = LinkedHashMap<String, LogicalOperation>()
+        operations.map { (key, value) ->
+            operations[key] = value.clone()
+        }
+        val builder = QueryBuilder(table, mOperations)
+        where?.let { builder.where(it.first, it.second.clone()) }
         builder.setFields(*fields.toTypedArray())
-        orderBy?.let { builder.orderBy(it) }
-        limit?.let { builder.limit(it) }
+        orderBy?.let { builder.orderBy(it.clone()) }
+        limit?.let { builder.limit(it.copy()) }
         return builder.apply {
             consumer.invoke(this)
         }
+    }
+
+    fun copy(): QuerySelect {
+        return newBuilder{  }.build()
     }
 
     /**
