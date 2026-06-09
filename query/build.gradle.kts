@@ -1,5 +1,3 @@
-import org.gradle.api.publish.maven.MavenPublication
-import org.gradle.kotlin.dsl.publishing
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
