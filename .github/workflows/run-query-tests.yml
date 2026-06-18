@@ -10,6 +10,7 @@ on:
     branches: [ main, develop ]
     paths:
       - 'query/**'
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
 concurrency:
@@ -79,10 +80,7 @@ jobs:
       - name: 🧪 Run :query unit tests
         id: run-tests
         run: |
-          ./gradlew :app:testUnitApp \
-            --parallel \
-            --build-cache \
-            --configuration-cache \
+          ./gradlew :query:test \
             --no-daemon \
             --warning-mode none \
             --console=plain \
