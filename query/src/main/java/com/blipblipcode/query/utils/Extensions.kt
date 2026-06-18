@@ -121,31 +121,47 @@ fun Queryable.asQueryRepeatedQueryParameters(predicate:(Pair<String, Any?>) -> B
         }
 }
 
-fun LogicalOperation.copy(operator: SQLOperator<*> = this.operator): LogicalOperation{
-    return when(this){
-        is All -> copy(operator = operator)
-        is And -> copy(operator = operator)
-        is AndNot -> copy(operator = operator)
-        is Exists -> copy( operator = operator)
-        is Multiple -> copy(operator = operator)
-        is Not -> copy(operator = operator)
-        is Or -> copy(operator = operator)
-        is Where -> copy(operator = operator)
+/**
+ * Creates a copy of this `LogicalOperation` with a new `SQLOperator`.
+ *
+ * @param operator The new `SQLOperator` to use.
+ * @return A new `LogicalOperation` instance with the updated operator.
+ */
+fun LogicalOperation.copyOperation(operator: SQLOperator<*> = this.operator): LogicalOperation {
+    return when (this) {
+        is All -> All(operator = operator)
+        is And -> And(operator = operator)
+        is AndNot -> AndNot(operator = operator)
+        is Exists -> Exists(operator = operator)
+        is Multiple -> {
+            val updatedOperations = operations.toMutableList()
+            if (updatedOperations.isNotEmpty()) {
+                updatedOperations[0] = updatedOperations[0].copyOperation(operator)
+            }
+            Multiple(updatedOperations, symbol)
+        }
+        is Not -> Not(operator = operator)
+        is Or -> Or(operator = operator)
+        is Where -> Where(operator = operator)
     }
 }
 
-fun OrderBy.copy(column: String = this.column, collation: Collation = this.collation, transform: (String) -> String = this.transform): OrderBy {
-    return when(this){
-        is Asc -> {
-            Asc(column, collation, transform)
-        }
-
-        is Desc -> {
-            Desc(column, collation, transform)
-        }
-
-        is OrderBy.Multiple -> {
-            OrderBy.Multiple(orders.map { it.copy(column, collation, transform) })
-        }
+/**
+ * Creates a copy of this `OrderBy` clause with updated parameters.
+ *
+ * @param column The new column name.
+ * @param collation The new collation to use.
+ * @param transform An optional transformation function for the column name.
+ * @return A new `OrderBy` instance with the updated parameters.
+ */
+fun OrderBy.copyOrderBy(
+    column: String = this.column,
+    collation: Collation = this.collation,
+    transform: (String) -> String = this.transform
+): OrderBy {
+    return when (this) {
+        is Asc -> Asc(column, collation, transform)
+        is Desc -> Desc(column, collation, transform)
+        is OrderBy.Multiple -> OrderBy.Multiple(orders.map { it.copyOrderBy(column, collation, transform) })
     }
 }

@@ -5,7 +5,7 @@ import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.utils.asSQLiteQuery
-import com.blipblipcode.query.utils.copy
+import com.blipblipcode.query.utils.copyOperation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
@@ -24,7 +24,7 @@ class QuerySelectTest {
             .build()
         val cloneQuery = query.newBuilder {
             it.transformOperation(key = key) { op ->
-                op.copy(SQLOperator.NotEquals(key, "active"))
+                op.copyOperation(SQLOperator.NotEquals(key, "active"))
             }
         }.build()
 

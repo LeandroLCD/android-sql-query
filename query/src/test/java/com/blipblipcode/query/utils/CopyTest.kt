@@ -12,7 +12,7 @@ class CopyTest {
     fun should_create_new_instance_of_LogicalOperation_when_copying_in_copy() {
         val operator = LogicalOperation.Where(SQLOperator.Equals("id", 1))
 
-        val newOperator = operator.copy(operator = SQLOperator.NotEquals("id", 2))
+        val newOperator = operator.copyOperation(operator = SQLOperator.NotEquals("id", 2))
 
         assertNotEquals(operator, newOperator)
         assertEquals(2, newOperator.operator.value)
@@ -22,7 +22,7 @@ class CopyTest {
     fun should_create_new_instance_of_OrderBy_when_copying_in_copy() {
         val orderBy = OrderBy.Asc("id")
 
-        val newOrderBy = orderBy.copy(column = "name")
+        val newOrderBy = orderBy.copyOrderBy(column = "name")
 
         assertNotEquals(orderBy, newOrderBy)
         assertEquals("name", newOrderBy.column)
