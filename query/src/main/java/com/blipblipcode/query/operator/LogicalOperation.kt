@@ -10,7 +10,7 @@ import kotlin.collections.forEachIndexed
  * @property symbol The type of the logical operation (e.g., AND, OR).
  * @property operator The SQL operator that is part of the logical operation.
  */
-sealed interface LogicalOperation{
+sealed interface LogicalOperation: Copyable<LogicalOperation> {
     val symbol: String
     val operator: SQLOperator<*>
 
@@ -20,8 +20,8 @@ sealed interface LogicalOperation{
             return "$symbol ${operator.toSQLString()}"
         }
 
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return Where(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return Where(operator.clone())
         }
     }
     data class And(override val operator: SQLOperator<*>) : LogicalOperation {
@@ -30,8 +30,8 @@ sealed interface LogicalOperation{
             return "$symbol ${operator.toSQLString()}"
         }
 
-        override fun clone(vararg arg: Any?): LogicalOperation {
-           return And(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+           return And( operator.clone())
         }
     }
     data class Or(override val operator: SQLOperator<*>) : LogicalOperation {
@@ -40,8 +40,8 @@ sealed interface LogicalOperation{
             return "$symbol ${operator.toSQLString()}"
         }
 
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return Or(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return Or(operator.clone())
         }
     }
     data class AndNot(override val operator: SQLOperator<*>) : LogicalOperation {
@@ -49,8 +49,8 @@ sealed interface LogicalOperation{
         override fun asString(): String {
             return "$symbol ${operator.toSQLString()}"
         }
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return And(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return AndNot(operator.clone())
         }
     }
     data class Exists(override val operator: SQLOperator<*>) : LogicalOperation{
@@ -58,8 +58,8 @@ sealed interface LogicalOperation{
         override fun asString(): String {
             return "$symbol ${operator.toSQLString()}"
         }
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return Exists(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return Exists(operator.clone())
         }
     }
     data class Not(override val operator: SQLOperator<*>) : LogicalOperation {
@@ -67,8 +67,8 @@ sealed interface LogicalOperation{
         override fun asString(): String {
             return "$symbol ${operator.toSQLString()}"
         }
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return Not(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return Not(operator.clone())
         }
     }
     data class All(override val operator: SQLOperator<*>) : LogicalOperation {
@@ -76,8 +76,8 @@ sealed interface LogicalOperation{
         override fun asString(): String {
             return "$symbol ${operator.toSQLString()}"
         }
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return All(arg[0] as SQLOperator<*>)
+        override fun clone(): LogicalOperation {
+            return All(operator.clone())
         }
     }
     @Suppress("UNCHECKED_CAST")
@@ -99,8 +99,8 @@ sealed interface LogicalOperation{
 
             }
         }
-        override fun clone(vararg arg: Any?): LogicalOperation {
-            return Multiple(arg[0] as List<LogicalOperation>, symbol = arg[1] as? String ?: symbol)
+        override fun clone(): LogicalOperation {
+            return Multiple(operations.map { it.clone() }, symbol =  symbol)
         }
     }
 
@@ -110,5 +110,6 @@ sealed interface LogicalOperation{
      */
     fun asString(): String
 
-    fun clone(vararg arg: Any?): LogicalOperation
+
+
 }

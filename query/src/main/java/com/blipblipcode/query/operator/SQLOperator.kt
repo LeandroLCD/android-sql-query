@@ -6,7 +6,7 @@ package com.blipblipcode.query.operator
  *
  * @param T The type of the value being compared.
  */
-sealed interface SQLOperator<T> {
+sealed interface SQLOperator<T>: Copyable<SQLOperator<T>> {
     val symbol: String
     val column: String
     val value: T
@@ -36,6 +36,7 @@ sealed interface SQLOperator<T> {
      */
     fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction(value.toString())}"
 
+
     /** Represents an "=" operation. */
     data class Equals<T>(
         override val column: String,
@@ -43,6 +44,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE
     ) : SQLOperator<T> {
         override val symbol: String = "="
+        override fun clone(): SQLOperator<T> {
+            return Equals(column, value, caseConversion)
+        }
     }
 
     /** Represents a "!=" operation. */
@@ -51,6 +55,9 @@ sealed interface SQLOperator<T> {
         override val value: T,
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "!="
+        override fun clone(): SQLOperator<T> {
+            return NotEquals(column, value, caseConversion)
+        }
     }
 
     /** Represents a ">" operation. */
@@ -59,6 +66,9 @@ sealed interface SQLOperator<T> {
         override val value: T,
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = ">"
+        override fun clone(): SQLOperator<T> {
+            return GreaterThan(column, value, caseConversion)
+        }
     }
 
     /** Represents a "<" operation. */
@@ -67,6 +77,9 @@ sealed interface SQLOperator<T> {
         override val value: T,
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "<"
+        override fun clone(): SQLOperator<T> {
+            return LessThan(column, value, caseConversion)
+        }
     }
 
     /** Represents a ">=" operation. */
@@ -74,7 +87,11 @@ sealed interface SQLOperator<T> {
     override val column: String,
     override val value: T,
     override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
+
         override val symbol: String = ">="
+        override fun clone(): SQLOperator<T> {
+            return GreaterThanOrEqual(column, value, caseConversion)
+        }
     }
 
     /** Represents a "<=" operation. */
@@ -83,6 +100,9 @@ sealed interface SQLOperator<T> {
         override val value: T,
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<T> {
         override val symbol: String = "<="
+        override fun clone(): SQLOperator<T> {
+            return LessThanOrEqual(column, value, caseConversion)
+        }
     }
 
     /** Represents a "LIKE" operation. */
@@ -91,8 +111,13 @@ sealed interface SQLOperator<T> {
         override val value: String,
         override val caseConversion: CaseConversion = CaseConversion.NONE) : SQLOperator<String> {
         override val symbol: String = "LIKE"
+
         override fun toSQLString(): String {
             return "${caseConversion.asSqlFunction(column)} $symbol ${caseConversion.asSqlFunction("'%$value%'")}"
+        }
+
+        override fun clone(): SQLOperator<String> {
+            return Like(column, value, caseConversion)
         }
     }
 
@@ -108,6 +133,9 @@ sealed interface SQLOperator<T> {
             }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
+        override fun clone(): SQLOperator<List<T>> {
+            return In(column, value, caseConversion)
+        }
     }
 
     /** Represents a "NOT IN" operation. */
@@ -122,6 +150,9 @@ sealed interface SQLOperator<T> {
             }
             return "${caseConversion.asSqlFunction(column)} $symbol ($list)"
         }
+        override fun clone(): SQLOperator<List<T>> {
+            return NotIn(column, value, caseConversion)
+        }
     }
 
     /** Represents an "IS NULL" operation. */
@@ -131,6 +162,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE
         override fun toSQLString(): String = "${caseConversion.asSqlFunction(column)} $symbol"
         override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol"
+        override fun clone(): SQLOperator<String?> {
+            return IsNull(column)
+        }
     }
 
     /** Represents an "IS NOT NULL" operation. */
@@ -140,6 +174,9 @@ sealed interface SQLOperator<T> {
         override val caseConversion: CaseConversion = CaseConversion.NONE
         override fun toSQLString(): String = "${caseConversion.asSqlFunction(column)}  $symbol"
         override fun asString(): String = "${caseConversion.asSqlFunction(column)}  $symbol"
+        override fun clone(): SQLOperator<String?> {
+            return IsNotNull(column)
+        }
     }
 
     /** Represents a "BETWEEN" operation. */
@@ -154,6 +191,14 @@ sealed interface SQLOperator<T> {
             val endStr = caseConversion.asSqlFunction(end.toString())
             return "${caseConversion.asSqlFunction(column)} $symbol '$startStr' AND '$endStr'"
         }
-        override fun asString(): String = "${caseConversion.asSqlFunction(column)} $symbol '${caseConversion.asSqlFunction(start.toString())}' AND '${caseConversion.asSqlFunction(start.toString())}'"
+
+        override fun asString(): String =
+            "${caseConversion.asSqlFunction(column)} $symbol '${caseConversion.asSqlFunction(start.toString())}' AND '${
+                caseConversion.asSqlFunction(start.toString())
+            }'"
+
+        override fun clone(): SQLOperator<Pair<T, T>> {
+            return Between(column, start, end, caseConversion)
+        }
     }
 }

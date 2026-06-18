@@ -29,4 +29,8 @@ data class Limit(
     override fun toString(): String {
         return asString()
     }
+
+    override fun clone(): SQLOperator<Int> {
+        return Limit(count, offset)
+    }
 }

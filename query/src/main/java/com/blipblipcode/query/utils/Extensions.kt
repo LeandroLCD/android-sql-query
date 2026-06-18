@@ -6,6 +6,20 @@ import com.blipblipcode.query.InnerJoint
 import com.blipblipcode.query.QuerySelect
 import com.blipblipcode.query.Queryable
 import com.blipblipcode.query.UnionQuery
+import com.blipblipcode.query.operator.Collation
+import com.blipblipcode.query.operator.LogicalOperation
+import com.blipblipcode.query.operator.LogicalOperation.All
+import com.blipblipcode.query.operator.LogicalOperation.And
+import com.blipblipcode.query.operator.LogicalOperation.AndNot
+import com.blipblipcode.query.operator.LogicalOperation.Exists
+import com.blipblipcode.query.operator.LogicalOperation.Multiple
+import com.blipblipcode.query.operator.LogicalOperation.Not
+import com.blipblipcode.query.operator.LogicalOperation.Or
+import com.blipblipcode.query.operator.LogicalOperation.Where
+import com.blipblipcode.query.operator.OrderBy
+import com.blipblipcode.query.operator.OrderBy.Asc
+import com.blipblipcode.query.operator.OrderBy.Desc
+import com.blipblipcode.query.operator.SQLOperator
 import com.blipblipcode.query.retrofit.RepeatedQueryParameters
 
 /**
@@ -105,4 +119,49 @@ fun Queryable.asQueryRepeatedQueryParameters(predicate:(Pair<String, Any?>) -> B
                 else -> acc
             }
         }
+}
+
+/**
+ * Creates a copy of this `LogicalOperation` with a new `SQLOperator`.
+ *
+ * @param operator The new `SQLOperator` to use.
+ * @return A new `LogicalOperation` instance with the updated operator.
+ */
+fun LogicalOperation.copyOperation(operator: SQLOperator<*> = this.operator): LogicalOperation {
+    return when (this) {
+        is All -> All(operator = operator)
+        is And -> And(operator = operator)
+        is AndNot -> AndNot(operator = operator)
+        is Exists -> Exists(operator = operator)
+        is Multiple -> {
+            val updatedOperations = operations.toMutableList()
+            if (updatedOperations.isNotEmpty()) {
+                updatedOperations[0] = updatedOperations[0].copyOperation(operator)
+            }
+            Multiple(updatedOperations, symbol)
+        }
+        is Not -> Not(operator = operator)
+        is Or -> Or(operator = operator)
+        is Where -> Where(operator = operator)
+    }
+}
+
+/**
+ * Creates a copy of this `OrderBy` clause with updated parameters.
+ *
+ * @param column The new column name.
+ * @param collation The new collation to use.
+ * @param transform An optional transformation function for the column name.
+ * @return A new `OrderBy` instance with the updated parameters.
+ */
+fun OrderBy.copyOrderBy(
+    column: String = this.column,
+    collation: Collation = this.collation,
+    transform: (String) -> String = this.transform
+): OrderBy {
+    return when (this) {
+        is Asc -> Asc(column, collation, transform)
+        is Desc -> Desc(column, collation, transform)
+        is OrderBy.Multiple -> OrderBy.Multiple(orders.map { it.copyOrderBy(column, collation, transform) })
+    }
 }

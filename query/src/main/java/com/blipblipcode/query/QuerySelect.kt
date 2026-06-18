@@ -44,8 +44,8 @@ class QuerySelect private constructor(
      */
     fun newBuilder(consumer: (QueryBuilder) -> Unit): QueryBuilder {
         val mOperations = LinkedHashMap<String, LogicalOperation>()
-        operations.map { (key, value) ->
-            operations[key] = value.clone()
+        operations.forEach { (key, value) ->
+            mOperations[key] = value.clone()
         }
         val builder = QueryBuilder(table, mOperations)
         where?.let { builder.where(it.first, it.second.clone()) }
@@ -142,9 +142,15 @@ class QuerySelect private constructor(
         }
     }
 
+    fun getOperators(): List<SQLOperator<*>> {
+        return operations.values.map { it.operator }
+    }
+
     fun getOperations(): Map<String, SQLOperator<*>> {
         return buildMap {
             where?.let { put(it.first, it.second.operator) }
+            limit?.let { put("limit", it) }
+            orderBy?.let { put("orderBy", it) }
             operations.forEach { put(it.key, it.value.operator) }
         }
     }
@@ -189,22 +195,23 @@ class QuerySelect private constructor(
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
+        val filteredWhere = where?.takeIf { predicate(it.second.operator) }
         val operationsStr =
             if (operations.isNotEmpty()) operations.values.filter { predicate(it.operator) }
                 .joinToString(" ") { it.asString() } else ""
         return buildString {
-            if (where == null) {
+            if (filteredWhere == null) {
                 append("SELECT $fieldStr FROM $table")
             } else {
-                append("SELECT $fieldStr FROM $table ${where?.second?.asString()} $operationsStr".trim())
+                append("SELECT $fieldStr FROM $table ${filteredWhere.second.asString()} $operationsStr".trim())
             }
-            if (orderBy != null) {
+            orderBy?.takeIf { predicate(it) }?.let {
                 append(" ")
-                append(orderBy!!.asString())
+                append(it.asString())
             }
-            if (limit != null) {
+            limit?.takeIf { predicate(it) }?.let {
                 append(" ")
-                append(limit!!.asString())
+                append(it.asString())
             }
         }
     }
@@ -220,6 +227,12 @@ class QuerySelect private constructor(
         orderBy = operator
         return this
     }
+
+    fun clearOrderBy(): Queryable {
+        orderBy = null
+        return this
+    }
+
 
     /**
      * Adds a LIMIT clause to the query to limit the number of rows returned.
@@ -246,6 +259,41 @@ class QuerySelect private constructor(
 
     fun getOrderBy(): OrderBy? {
         return this.orderBy
+    }
+
+    fun getLimit(): Limit? {
+        return this.limit
+    }
+
+    /**
+     * Converts this [QuerySelect] into a [QueryDelete] targeting the same table and using the same
+     * WHERE and AND/OR conditions. Fields, ORDER BY and LIMIT are ignored since they are not
+     * applicable to DELETE statements.
+     *
+     * @return A [QueryDelete] instance with the same filters as this [QuerySelect].
+     * @throws IllegalArgumentException if this [QuerySelect] has no WHERE clause defined.
+     */
+    fun toQueryDelete(): QueryDelete {
+        require(where != null) { "QuerySelect must have a WHERE clause to be converted to QueryDelete" }
+
+        val deleteQuery = QueryDelete.builder(getTableName())
+            .where(where!!.second.operator)
+            .build()
+
+        operations.forEach { (key, operation) ->
+            deleteQuery.addLogicalOperation(key, operation)
+        }
+
+        return deleteQuery
+    }
+
+    /**
+     * Clears the LIMIT clause from the query.
+     * @return The current `QuerySelect` instance for chaining.
+     */
+    fun clearLimit(): QuerySelect {
+        limit = null
+        return this
     }
 
 
@@ -309,6 +357,15 @@ class QuerySelect private constructor(
          */
         fun andNot(operator: SQLOperator<*>): QueryBuilder {
             operations[operator.column] = LogicalOperation.AndNot(operator)
+            return this
+        }
+        /**
+         * Adds an AND NOT logical operation to the query.
+         * @param operator The SQL operator for this condition.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun andNot(key: String, operator: SQLOperator<*>): QueryBuilder {
+            operations[key] = LogicalOperation.AndNot(operator)
             return this
         }
 
