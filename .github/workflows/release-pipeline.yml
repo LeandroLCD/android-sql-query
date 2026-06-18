@@ -1,0 +1,512 @@
+name: 🚀 Release Pipeline — PR to Master
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TRIGGER
+# Corre en todos los eventos de PR hacia master.
+# Los pasos 3-4-5 solo se ejecutan cuando el PR es mergeado.
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  pull_request:
+    branches:
+      - master
+    types: [opened, synchronize, reopened, closed]
+
+# Cancela runs previos en el mismo PR si llega un nuevo push.
+# Si el PR fue mergeado, no se cancela (es el run definitivo).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────────────────────
+jobs:
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 1 — Unit Tests
+  # Corre en cada push al PR (opened / synchronize / reopened) y al mergear.
+  # ───────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: 🧪 Step 1 — Unit Tests
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    outputs:
+      result: ${{ steps.run-tests.outcome }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🐘 Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: 🔧 Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+
+      - name: 🧪 Run :query unit tests
+        id: run-tests
+        run: |
+          ./gradlew :query:test \
+            --no-daemon \
+            --warning-mode none \
+            --console=plain \
+            --stacktrace
+
+      - name: 📊 Publish unit test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: query/build/test-results/**/*.xml
+          check_name: 📋 Unit Test Results — :query
+          comment_title: 🧪 Unit Test Report — :query module
+          comment_mode: always
+
+      - name: 📄 Upload test report on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: unit-test-report-${{ github.run_number }}
+          path: query/build/reports/tests/
+          retention-days: 14
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 2 — Check Tag Availability & Version Bump
+  # Verifica dos condiciones:
+  #   a) El tag v[newVersion] NO existe aún (no duplicado).
+  #   b) newVersion > latestTag (la versión fue efectivamente incrementada).
+  # ───────────────────────────────────────────────────────────────────────────
+  check-tag:
+    name: 🏷️ Step 2 — Check Tag & Version Bump
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    outputs:
+      version:      ${{ steps.extract-version.outputs.version }}
+      tag_name:     ${{ steps.extract-version.outputs.tag_name }}
+      latest_tag:   ${{ steps.validate-version.outputs.latest_tag }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # historial completo para leer todos los tags
+
+      - name: 📌 Extract version from build.gradle.kts
+        id: extract-version
+        run: |
+          # Busca 'version = "x.x.x"' en build.gradle.kts raíz,
+          # con fallback al módulo query.
+          VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' build.gradle.kts 2>/dev/null | head -1 || true)
+
+          if [ -z "$VERSION" ]; then
+            VERSION=$(grep -oP 'version\s*=\s*"\K[^"]+' query/build.gradle.kts 2>/dev/null | head -1 || true)
+          fi
+
+          if [ -z "$VERSION" ]; then
+            echo "❌ No se encontró 'version = \"...\"' en build.gradle.kts ni en query/build.gradle.kts"
+            exit 1
+          fi
+
+          TAG_NAME="v${VERSION}"
+          echo "version=${VERSION}"   >> $GITHUB_OUTPUT
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "📌 Versión en Gradle: ${VERSION}  →  Tag a crear: ${TAG_NAME}"
+
+      - name: "🔍 Validate: new tag > latest tag & no duplicate"
+        id: validate-version
+        run: |
+          NEW_VERSION="${{ steps.extract-version.outputs.version }}"
+          NEW_TAG="${{ steps.extract-version.outputs.tag_name }}"
+
+          # ── Función de comparación semver (soporta MAJOR.MINOR.PATCH) ──────
+          # Devuelve 0 si $1 > $2, 1 en caso contrario.
+          semver_gt() {
+            # strip leading 'v'
+            local A="${1#v}" B="${2#v}"
+            # split en partes usando IFS
+            local IFS=.
+            read -ra VA <<< "$A"
+            read -ra VB <<< "$B"
+            # rellenar con ceros si faltan segmentos (e.g. 1.0 → 1.0.0)
+            for i in 0 1 2; do
+              local a="${VA[$i]:-0}" b="${VB[$i]:-0}"
+              if   (( 10#$a > 10#$b )); then return 0   # A > B
+              elif (( 10#$a < 10#$b )); then return 1   # A < B
+              fi
+            done
+            return 1   # A == B → no es estrictamente mayor
+          }
+
+          # ── Obtener el último tag semver del repo ────────────────────────
+          # git tag -l lista todos; sort -V ordena semánticamente; tail toma el mayor.
+          LATEST_TAG=$(git tag -l 'v*' | sort -V | tail -1)
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "ℹ️  No hay tags previos en el repo. Primer release: ${NEW_TAG}"
+            echo "latest_tag=ninguno" >> $GITHUB_OUTPUT
+            echo "✅ Validación superada — primer release."
+            exit 0
+          fi
+
+          echo "latest_tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+          echo "🏷️  Último tag existente : ${LATEST_TAG}"
+          echo "🆕 Nuevo tag a crear    : ${NEW_TAG}"
+
+          # ── a) Verificar que el tag exacto no exista ─────────────────────
+          if git ls-remote --tags origin "refs/tags/${NEW_TAG}" | grep -q "${NEW_TAG}"; then
+            echo ""
+            echo "❌ ERROR: El tag ${NEW_TAG} ya existe en el repositorio."
+            echo "   Incrementa la versión en build.gradle.kts antes de mergear."
+            exit 1
+          fi
+
+          # ── b) Verificar que newVersion > latestTag ───────────────────────
+          if semver_gt "$NEW_VERSION" "$LATEST_TAG"; then
+            echo ""
+            echo "✅ Validación superada: ${NEW_TAG} > ${LATEST_TAG}"
+          else
+            echo ""
+            echo "❌ ERROR: La versión ${NEW_VERSION} NO es mayor que el último tag ${LATEST_TAG}."
+            echo "   Regla: el nuevo tag debe ser estrictamente mayor al último publicado."
+            echo "   Ejemplo válido  : ${LATEST_TAG} → v$(echo ${LATEST_TAG#v} | awk -F. '{print $1"."$2"."$3+1}')"
+            exit 1
+          fi
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 3 — Build :query Release AAR
+  # Depende de Step 1 y Step 2. Solo corre cuando el PR es mergeado.
+  # ───────────────────────────────────────────────────────────────────────────
+  build-release:
+    name: 🏗️ Step 3 — Build :query Release AAR
+    runs-on: ubuntu-latest
+    needs: [unit-tests, check-tag]
+    if: github.event.pull_request.merged == true
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: 🐘 Setup Gradle (cache)
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: 🔧 Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+
+      - name: 🏗️ Assemble :query Release
+        run: |
+          ./gradlew :query:assembleRelease \
+            --no-daemon \
+            --warning-mode none \
+            --console=plain \
+            --stacktrace
+
+      - name: 🔎 Locate generated AAR
+        id: find-aar
+        run: |
+          AAR_PATH=$(find query/build/outputs/aar -name "*release*.aar" | head -1)
+          if [ -z "$AAR_PATH" ]; then
+            echo "❌ No se encontró ningún AAR release en query/build/outputs/aar/"
+            exit 1
+          fi
+          echo "aar_path=${AAR_PATH}" >> $GITHUB_OUTPUT
+          echo "✅ AAR encontrado: ${AAR_PATH}"
+
+      - name: 📦 Upload AAR as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: query-release-aar
+          path: ${{ steps.find-aar.outputs.aar_path }}
+          retention-days: 7
+          if-no-files-found: error
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 4 — Create Tag & GitHub Release
+  # Depende de Step 3. Adjunta el AAR al release.
+  # ───────────────────────────────────────────────────────────────────────────
+  create-release:
+    name: 🎯 Step 4 — Create Tag & GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-release, check-tag]
+    if: github.event.pull_request.merged == true
+    timeout-minutes: 10
+
+    permissions:
+      contents: write
+
+    outputs:
+      release_url: ${{ steps.gh-release.outputs.url }}
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📦 Download AAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: query-release-aar
+          path: ./release-artifacts
+
+      - name: 🏷️ Create GitHub Release & Tag
+        id: gh-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.check-tag.outputs.tag_name }}
+          name: Release ${{ needs.check-tag.outputs.tag_name }}
+          body: |
+            ## 📦 android-sql-query ${{ needs.check-tag.outputs.tag_name }}
+
+            Publicado automáticamente desde PR #${{ github.event.pull_request.number }}
+            **${{ github.event.pull_request.title }}**
+
+            ---
+
+            ### 📥 Agregar como dependencia via JitPack
+
+            ```kotlin
+            // settings.gradle.kts
+            dependencyResolutionManagement {
+                repositories {
+                    maven { url = uri("https://jitpack.io") }
+                }
+            }
+
+            // build.gradle.kts (module)
+            dependencies {
+                implementation("com.github.LeandroLCD:android-sql-query:${{ needs.check-tag.outputs.version }}")
+            }
+            ```
+
+            ---
+            📅 Generado el: ${{ github.event.pull_request.merged_at }}
+          files: ./release-artifacts/*.aar
+          make_latest: true
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 5 — JitPack Build Log
+  # Espera a que JitPack indexe el tag y muestra el build log.
+  # ───────────────────────────────────────────────────────────────────────────
+  jitpack-build:
+    name: 📡 Step 5 — JitPack Build Log
+    runs-on: ubuntu-latest
+    needs: [create-release, check-tag]
+    if: github.event.pull_request.merged == true
+    timeout-minutes: 20
+
+    outputs:
+      jitpack_status: ${{ steps.poll-jitpack.outputs.jitpack_status }}
+      jitpack_log_url: ${{ steps.poll-jitpack.outputs.jitpack_log_url }}
+
+    steps:
+      - name: ⏳ Initial wait — let JitPack index the new tag
+        run: |
+          echo "⏳ Esperando 40s para que JitPack indexe el tag ${{ needs.check-tag.outputs.tag_name }}..."
+          sleep 40
+
+      - name: 🚀 Trigger JitPack build & poll status
+        id: poll-jitpack
+        run: |
+          VERSION="${{ needs.check-tag.outputs.version }}"
+          GROUP="com.github.LeandroLCD"
+          ARTIFACT="android-sql-query"
+          LOG_URL="https://jitpack.io/${GROUP//.//}/${ARTIFACT}/${VERSION}/build.log"
+          API_URL="https://jitpack.io/api/builds/${GROUP}/${ARTIFACT}/${VERSION}"
+
+          echo "🔗 Log URL : ${LOG_URL}"
+          echo "🔗 API URL : ${API_URL}"
+
+          # Dispara la build solicitando el artefacto
+          echo "🚀 Disparando build en JitPack..."
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            "https://jitpack.io/${GROUP//.//}/${ARTIFACT}/${VERSION}/${ARTIFACT}-${VERSION}.aar" || true
+
+          # Polling: máximo 15 intentos × 30s = 7.5 min
+          MAX=15
+          ATTEMPT=0
+          STATUS="unknown"
+
+          while [ $ATTEMPT -lt $MAX ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "⏳ Intento ${ATTEMPT}/${MAX} — consultando estado en JitPack..."
+
+            RESPONSE=$(curl -s --max-time 15 "${API_URL}" 2>/dev/null || echo '{}')
+            STATUS=$(echo "$RESPONSE" | python3 -c \
+              "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
+
+            echo "   📊 Status: ${STATUS}"
+
+            if [ "$STATUS" = "ok" ]; then
+              echo "✅ JitPack build exitoso!"
+              break
+            elif [ "$STATUS" = "error" ]; then
+              echo "❌ JitPack build falló. Revisa el log:"
+              echo "   ${LOG_URL}"
+              break
+            fi
+
+            [ $ATTEMPT -lt $MAX ] && sleep 30
+          done
+
+          echo "jitpack_status=${STATUS}"   >> $GITHUB_OUTPUT
+          echo "jitpack_log_url=${LOG_URL}" >> $GITHUB_OUTPUT
+
+      - name: 📄 Print JitPack build log
+        if: always()
+        run: |
+          VERSION="${{ needs.check-tag.outputs.version }}"
+          LOG_URL="https://jitpack.io/com/github/LeandroLCD/android-sql-query/${VERSION}/build.log"
+          echo "════════════════════════════════════════"
+          echo " JitPack Build Log — ${VERSION}"
+          echo "════════════════════════════════════════"
+          curl -s --max-time 30 "${LOG_URL}" || echo "⚠️  No se pudo obtener el log aún. URL: ${LOG_URL}"
+          echo "════════════════════════════════════════"
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # PR ANNOTATION — Resumen del pipeline como comentario en el PR
+  # Corre siempre al final (after all jobs), sin importar el resultado.
+  # ───────────────────────────────────────────────────────────────────────────
+  pr-summary:
+    name: 📝 PR Summary Annotation
+    runs-on: ubuntu-latest
+    needs: [unit-tests, check-tag, build-release, create-release, jitpack-build]
+    # always() para que corra aunque algún job haya fallado o skipped
+    if: always() && (github.event.action != 'closed' || github.event.pull_request.merged == true)
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: 📝 Post pipeline summary comment on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const icon = (r) => ({
+              success: '✅', failure: '❌', skipped: '⏭️', cancelled: '🚫'
+            }[r] ?? '⚠️');
+
+            const isMerged   = ${{ github.event.pull_request.merged == true }};
+            const version    = `${{ needs.check-tag.outputs.version }}`;
+            const tagName    = `${{ needs.check-tag.outputs.tag_name }}`;
+            const latestTag  = `${{ needs.check-tag.outputs.latest_tag }}`;
+            const releaseUrl = `${{ needs.create-release.outputs.release_url }}`;
+            const jitpackStatus = `${{ needs.jitpack-build.outputs.jitpack_status }}`;
+            const jitpackLog    = `${{ needs.jitpack-build.outputs.jitpack_log_url }}`;
+
+            const r1 = `${{ needs.unit-tests.result }}`;
+            const r2 = `${{ needs.check-tag.result }}`;
+            const r3 = `${{ needs.build-release.result }}`;
+            const r4 = `${{ needs.create-release.result }}`;
+            const r5 = `${{ needs.jitpack-build.result }}`;
+
+            const mergeRow = isMerged
+              ? '✅ **Mergeado** — pipeline completo ejecutado'
+              : '⏳ **Pendiente de merge** — solo validaciones previas';
+
+            const releaseLink = releaseUrl
+              ? `[Ver GitHub Release](${releaseUrl})`
+              : '—';
+
+            const jitpackRow = jitpackLog
+              ? `[📄 Build Log](${jitpackLog}) · Status: \`${jitpackStatus}\``
+              : '—';
+
+            // Detalle de la validación semver para la tabla
+            const versionArrow = (latestTag && latestTag !== 'ninguno' && tagName)
+              ? `\`${latestTag}\` → \`${tagName}\``
+              : tagName ? `primer release: \`${tagName}\`` : 'N/A';
+
+            const depBlock = isMerged && version ? `
+            ### 📥 Dependency (JitPack)
+            \`\`\`kotlin
+            // settings.gradle.kts
+            maven { url = uri("https://jitpack.io") }
+
+            // build.gradle.kts
+            implementation("com.github.LeandroLCD:android-sql-query:${version}")
+            \`\`\`` : '';
+
+            const warningBlock = (!isMerged && (r1 === 'failure' || r2 === 'failure'))
+              ? `\n> ⚠️ **Hay errores de validación.** Corrígelos antes de mergear.\n`
+              : '';
+
+            const body = `## 🚀 Release Pipeline — Resumen
+
+            ${warningBlock}
+            | # | Paso | Estado | Detalle |
+            |---|------|--------|---------|
+            | 1️⃣ | Unit Tests | ${icon(r1)} \`${r1}\` | Tests unitarios del módulo \`:query\` |
+            | 2️⃣ | Check Tag & Bump | ${icon(r2)} \`${r2}\` | ${versionArrow} |
+            | 3️⃣ | Build Release AAR | ${icon(r3)} \`${r3}\` | \`./gradlew :query:assembleRelease\` |
+            | 4️⃣ | GitHub Release | ${icon(r4)} \`${r4}\` | Tag \`${tagName || 'N/A'}\` + AAR · ${releaseLink} |
+            | 5️⃣ | JitPack Build | ${icon(r5)} \`${r5}\` | ${jitpackRow} |
+
+            **📌 Versión nueva:** \`${version || 'no detectada'}\` &nbsp;·&nbsp; **🏷️ Último tag:** \`${latestTag || '—'}\`
+            **🔀 Estado:** ${mergeRow}
+            ${depBlock}
+
+            ---
+            <sub>🤖 Generado automáticamente por el Release Pipeline · Run #${{ github.run_number }}</sub>`;
+
+            // Busca si ya existe un comentario previo del bot para actualizarlo
+            const comments = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.data.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Release Pipeline — Resumen')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
