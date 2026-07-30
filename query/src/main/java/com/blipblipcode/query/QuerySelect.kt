@@ -20,7 +20,7 @@ class QuerySelect private constructor(
     private val table: String,
     private val operations: LinkedHashMap<String, LogicalOperation>,
     private val fields: List<String>
-) : Queryable {
+) : Queryable, Deletable {
     private var orderBy: OrderBy? = null
     private var limit: Limit? = null
 
@@ -273,7 +273,7 @@ class QuerySelect private constructor(
      * @return A [QueryDelete] instance with the same filters as this [QuerySelect].
      * @throws IllegalArgumentException if this [QuerySelect] has no WHERE clause defined.
      */
-    fun toQueryDelete(): QueryDelete {
+    override fun toQueryDelete(): QueryDelete {
         require(where != null) { "QuerySelect must have a WHERE clause to be converted to QueryDelete" }
 
         val deleteQuery = QueryDelete.builder(getTableName())

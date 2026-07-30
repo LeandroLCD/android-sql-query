@@ -2,7 +2,9 @@ package com.blipblipcode.query.utils
 
 import androidx.sqlite.db.SimpleSQLiteQuery
 import androidx.sqlite.db.SupportSQLiteQuery
+import com.blipblipcode.query.Deletable
 import com.blipblipcode.query.InnerJoint
+import com.blipblipcode.query.QueryDelete
 import com.blipblipcode.query.QuerySelect
 import com.blipblipcode.query.Queryable
 import com.blipblipcode.query.UnionQuery
@@ -165,3 +167,32 @@ fun OrderBy.copyOrderBy(
         is OrderBy.Multiple -> OrderBy.Multiple(orders.map { it.copyOrderBy(column, collation, transform) })
     }
 }
+
+/**
+ * Converts this [Deletable] into a [QueryDelete] using its default conversion.
+ *
+ * This is a thin alias over [Deletable.toQueryDelete] provided so call sites can
+ * use a Kotlin-friendly naming convention without losing the polymorphism of
+ * the [Deletable] contract.
+ *
+ * Works for any [QuerySelect] (no parameters needed) and any [UnionQuery] (which
+ * always throws and asks for a target table/key column via its `toDelete`
+ * overload below).
+ *
+ * @return A [QueryDelete] instance built from this [Deletable].
+ * @throws IllegalArgumentException if the underlying conversion cannot be
+ * performed without extra context.
+ */
+fun Deletable.toDelete(): QueryDelete = toQueryDelete()
+
+/**
+ * Converts this [UnionQuery] into a [QueryDelete] that uses the union as a sub-query.
+ *
+ * @param targetTable The name of the table to delete rows from.
+ * @param keyColumn   The column used to match rows between `targetTable` and the union
+ *                    result. The same column must exist (and be selectable) on every
+ *                    inner query.
+ * @return A [QueryDelete] instance that deletes from `targetTable` matching the union result.
+ */
+fun UnionQuery.toDelete(targetTable: String, keyColumn: String): QueryDelete =
+    toQueryDelete(targetTable, keyColumn)

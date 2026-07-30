@@ -1,4 +1,4 @@
-name: Run Query Unit Tests
+name: 🧪 Run Query Unit Tests
 
 on:
   push:
@@ -10,51 +10,120 @@ on:
     branches: [ main, develop ]
     paths:
       - 'query/**'
+    types: [opened, reopened, synchronize]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event.action != 'closed' }}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JOBS
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
-  test:
-    name: Run Query Module Tests
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # STEP 1 — Unit Tests
+  # Corre en cada push al PR (opened / synchronize / reopened) y al mergear.
+  # ───────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: 🧪 Step 1 — Unit Tests
     runs-on: ubuntu-latest
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    timeout-minutes: 30
+
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+
+    outputs:
+      result: ${{ steps.run-tests.outcome }}
 
     steps:
       - name: 📥 Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
 
       - name: ☕ Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
           cache: gradle
 
-      - name: 🔑 Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: 📦 Restore Gradle cache
+        id: gradle-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
 
-      - name: 🧪 Run Query Unit Tests
-        run: ./gradlew :query:runQueryUnitTests
+      - name: 🗑️ Delete stale cache
+        if: steps.gradle-cache.outputs.cache-hit != 'true' && steps.gradle-cache.outputs.cache-matched-key != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "⚠️ Cache obsoleto detectado: ${{ steps.gradle-cache.outputs.cache-matched-key }}"
+          echo "🗑️ Eliminando cache antiguo para liberar espacio..."
+          gh cache delete "${{ steps.gradle-cache.outputs.cache-matched-key }}" --repo ${{ github.repository }} || true
+          echo "✅ Cache obsoleto eliminado"
 
-      - name: 📊 Upload test results
-        uses: actions/upload-artifact@v4
+      - name: 🔧 Grant execute permission to gradlew
+        run: chmod +x ./gradlew
+
+      - name: 🧪 Run :query unit tests
+        id: run-tests
+        run: |
+          ./gradlew :query:test \
+            --no-daemon \
+            --warning-mode none \
+            --console=plain \
+            --stacktrace
+
+      - name: 📊 Publish unit test results
+        uses: EnricoMi/publish-unit-test-result-action@v2
         if: always()
         with:
-          name: test-results
-          path: query/build/test-results/testDebugUnitTest/
-          retention-days: 30
+          files: query/build/test-results/**/*.xml
+          check_name: 📋 Unit Test Results — :query
+          comment_title: 🧪 Unit Test Report — :query module
+          comment_mode: always
 
-      - name: 📈 Upload test reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: test-reports
-          path: query/build/reports/tests/testDebugUnitTest/
-          retention-days: 30
-
-      - name: ✅ Test Summary
-        if: success()
-        run: echo "✅ Todos los tests del módulo query pasaron exitosamente!"
-
-      - name: ❌ Test Failed
+      - name: 📄 Upload test report on failure
+        uses: actions/upload-artifact@v7
         if: failure()
-        run: echo "❌ Algunos tests fallaron. Revisa los reportes para más detalles."
+        with:
+          name: unit-test-report-${{ github.run_number }}
+          path: query/build/reports/tests/
+          retention-days: 14
 
+      - name: 🧹 Clean Temporal files.
+        if: always()
+        run: |
+          echo "🧹 Clean Temporal files.."
+          rm -rf ~/.gradle/caches/modules-2/modules-2.lock
+          rm -rf ~/.gradle/caches/*/plugin-resolution/
+          rm -rf ~/.gradle/daemon/
+          echo "✨ Clean Temporal files Complete"
+
+      - name: 🏁 workflow finished
+        if: always()
+        run: |
+          echo "=================================="
+          echo "🏁 Workflow Unit Tests finished"
+          echo "=================================="
+          echo ""
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ state: SUCCESS"
+          else
+            echo "❌ state: FAILED"
+          fi
+          echo ""
+          echo "📅 Date: $(date '+%Y-%m-%d %H:%M:%S')"
+          echo "=================================="
