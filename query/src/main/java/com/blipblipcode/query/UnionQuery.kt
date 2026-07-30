@@ -16,7 +16,7 @@ import com.blipblipcode.query.operator.SQLOperator
 class UnionQuery private constructor(
     val queries: List<QuerySelect>,
     val useUnionAll: Boolean = false
-) : Queryable {
+) : Queryable, Deletable {
     private var orderBy: OrderBy? = null
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return queries.flatMap { it.getSqlOperators() }
@@ -195,6 +195,55 @@ class UnionQuery private constructor(
         return newBuilder {  }.build()
     }
 
+    /**
+     * Converts this [UnionQuery] into a [QueryDelete] is **not supported** without extra
+     * context, because a UNION spans multiple tables and the resulting DELETE needs an
+     * explicit target table and a join column.
+     *
+     * Use [toQueryDelete] with a `targetTable` and a `keyColumn` instead.
+     *
+     * @throws IllegalArgumentException always.
+     */
+    override fun toQueryDelete(): QueryDelete {
+        throw IllegalArgumentException(
+            "UnionQuery cannot be converted to QueryDelete without a target table and a " +
+                "key column. Call toQueryDelete(targetTable, keyColumn) instead."
+        )
+    }
+
+    /**
+     * Converts this [UnionQuery] into a [QueryDelete] that uses the union as a sub-query.
+     *
+     * The generated SQL follows the pattern:
+     * ```
+     * DELETE FROM <targetTable> WHERE <keyColumn> IN (
+     *     SELECT <keyColumn> FROM (
+     *         <union_query>
+     *     )
+     * )
+     * ```
+     *
+     * `ORDER BY` / `LIMIT` defined on the inner queries are kept untouched: they only shape
+     * the sub-query, not the outer DELETE.
+     *
+     * @param targetTable The name of the table to delete rows from.
+     * @param keyColumn   The column used to match rows between `targetTable` and the union
+     *                    result. The same column must exist (and be selectable) on every
+     *                    inner query.
+     * @return A [QueryDelete] that deletes from `targetTable` matching the union result.
+     * @throws IllegalArgumentException if this [UnionQuery] contains fewer than two queries.
+     */
+    fun toQueryDelete(targetTable: String, keyColumn: String): QueryDelete {
+        require(queries.size >= 2) { "At least two queries are required for a UNION" }
+        val subQuery = asSql()
+        return QueryDelete.builder(targetTable)
+            .where(SQLOperator.InSubquery(column = keyColumn, value = subQuery))
+            .build()
+    }
+
+    fun toQueriesDelete(): List<QueryDelete> {
+        return queries.map { it.toQueryDelete() }
+    }
     /**
      * A builder for creating `UnionQuery` instances.
      * This class provides a fluent API to construct a UNION query.

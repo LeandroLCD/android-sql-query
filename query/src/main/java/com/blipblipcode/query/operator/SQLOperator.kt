@@ -201,4 +201,16 @@ sealed interface SQLOperator<T>: Copyable<SQLOperator<T>> {
             return Between(column, start, end, caseConversion)
         }
     }
+
+    /** Represents an "IN" operation whose value is a sub-query string. */
+    data class InSubquery(
+        override val column: String,
+        override val value: String,
+        override val caseConversion: CaseConversion = CaseConversion.NONE
+    ) : SQLOperator<String> {
+        override val symbol: String = "IN"
+        override fun toSQLString(): String =
+            "${caseConversion.asSqlFunction(column)} $symbol (${caseConversion.asSqlFunction(value)})"
+        override fun clone(): SQLOperator<String> = InSubquery(column, value, caseConversion)
+    }
 }
