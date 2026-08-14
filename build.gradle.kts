@@ -5,4 +5,4 @@ plugins {
     alias(libs.plugins.android.library) apply false
 }
 
-version = "0.13.4"
+version = "0.13.5"
