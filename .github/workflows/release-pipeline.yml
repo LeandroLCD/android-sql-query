@@ -581,3 +581,152 @@ jobs:
                 body,
               });
             }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # DISCORD NOTIFICATION — Job independiente que reporta el resultado del
+  # pipeline. Corre siempre que el PR haya sido mergeado, incluso si algún
+  # job anterior falló o fue skipped. No afecta el status global del run.
+  # ─────────────────────────────────────────────────────────────────────────
+  notify-discord:
+    name: 📣 Notify Discord
+    runs-on: ubuntu-latest
+    needs: [check-tag, build-release, create-release, jitpack-build]
+    if: always() && github.event.pull_request.merged == true
+    timeout-minutes: 5
+    continue-on-error: true
+
+    steps:
+      - name: 📣 Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          R1: ${{ needs.check-tag.result }}
+          R2: ${{ needs.build-release.result }}
+          R3: ${{ needs.create-release.result }}
+          R4: ${{ needs.jitpack-build.result }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          AUTHOR: ${{ github.actor }}
+          EVENT: ${{ github.event_name }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          LIBRARY_NAME: ${{ github.repository }}
+          VERSION: ${{ needs.check-tag.outputs.version }}
+          TAG: ${{ needs.check-tag.outputs.tag_name }}
+          JITPACK_STATUS: ${{ needs.jitpack-build.outputs.jitpack_status }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Status agregado del pipeline a partir de los resultados de cada job.
+          # Cualquier failure domina; si todos success → success; etc.
+          if   [ "$R1" = "failure" ] || [ "$R2" = "failure" ] || [ "$R3" = "failure" ] || [ "$R4" = "failure" ]; then
+            STATUS="failure"
+          elif [ "$R1" = "cancelled" ] || [ "$R2" = "cancelled" ] || [ "$R3" = "cancelled" ] || [ "$R4" = "cancelled" ]; then
+            STATUS="cancelled"
+          elif [ "$R1" = "success" ] && [ "$R2" = "success" ] && [ "$R3" = "success" ] && [ "$R4" = "success" ]; then
+            STATUS="success"
+          else
+            STATUS="skipped"
+          fi
+
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "⚠️  DISCORD_WEBHOOK_URL no configurado — saltando notificación"
+            {
+              echo "## 📣 Discord notification skipped"
+              echo "DISCORD_WEBHOOK_URL secret no configurado en este repo."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          case "$STATUS" in
+            success)   EMOJI="✅"; COLOR=3066993 ;;
+            failure)   EMOJI="❌"; COLOR=15158332 ;;
+            cancelled) EMOJI="⚪"; COLOR=9807270 ;;
+            *)         EMOJI="ℹ️"; COLOR=3447003 ;;
+          esac
+
+          SHORT_SHA="${SHA:0:7}"
+          # Nombre de la librería = último segmento del repo (ej: "compose-components")
+          LIBRARY_NAME="${LIBRARY_NAME##*/}"
+          VERSION_DISPLAY="${VERSION:-N/A}"
+          TAG_DISPLAY="${TAG:-N/A}"
+          # Título del embed: "<library> — new release <version>"
+          if [ -n "$VERSION" ] && [ "$VERSION_DISPLAY" != "N/A" ]; then
+            EMBED_TITLE="${EMOJI} ${LIBRARY_NAME} — new release ${VERSION_DISPLAY}"
+          else
+            EMBED_TITLE="${EMOJI} ${LIBRARY_NAME} — release pipeline"
+          fi
+          # Link al release del tag (donde queda adjunto el AAR).
+          # Se construye desde RUN_URL para no depender de que create-release haya corrido bien.
+          if [ -n "$TAG" ]; then
+            TAG_URL="${RUN_URL%/*}/releases/tag/${TAG}"
+            ARTIFACT_LINK="[${TAG}](${TAG_URL})"
+          else
+            ARTIFACT_LINK="—"
+          fi
+          JITPACK_DISPLAY="${JITPACK_STATUS:-skipped}"
+
+          # PR info (solo si el evento fue un PR)
+          PR_FIELDS='[]'
+          if [ -n "${PR_NUMBER:-}" ]; then
+            PR_FIELDS=$(jq -nc \
+              --arg title "${PR_TITLE:-}" \
+              --arg num "$PR_NUMBER" \
+              --arg url "${RUN_URL%/*}/pull/${PR_NUMBER}" \
+              '[{name: "Pull Request", value: ("[PR #" + $num + ": " + $title + "](" + $url + ")"), inline: false}]')
+          fi
+
+          # Payload construido con jq para evitar problemas de quoting
+          PAYLOAD=$(jq -nc \
+            --arg username "GitHub Actions" \
+            --arg avatar "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+            --arg title "$EMBED_TITLE" \
+            --arg run_url "$RUN_URL" \
+            --argjson color "$COLOR" \
+            --arg status "$STATUS" \
+            --arg short_sha "$SHORT_SHA" \
+            --arg author "$AUTHOR" \
+            --arg event "$EVENT" \
+            --arg branch "$BRANCH" \
+            --arg version "$VERSION_DISPLAY" \
+            --arg tag "$TAG_DISPLAY" \
+            --arg release_link "$ARTIFACT_LINK" \
+            --arg jitpack "$JITPACK_DISPLAY" \
+            --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson pr_fields "$PR_FIELDS" \
+            '{
+              username: $username,
+              avatar_url: $avatar,
+              embeds: [{
+                title: $title,
+                url: $run_url,
+                color: $color,
+                fields: (
+                  [
+                    {name: "Estado",  value: $status,         inline: true},
+                    {name: "Branch",  value: $branch,         inline: true},
+                    {name: "Commit",  value: ("`" + $short_sha + "`"), inline: true},
+                    {name: "Autor",   value: $author,         inline: true},
+                    {name: "Evento",  value: $event,          inline: true},
+                    {name: "Versión", value: $version,        inline: true},
+                    {name: "Tag",     value: $tag,            inline: true},
+                    {name: "Artifact", value: $release_link,   inline: false},
+                    {name: "JitPack", value: $jitpack,        inline: true}
+                  ] + $pr_fields
+                ),
+                timestamp: $ts
+              }]
+            }')
+
+          HTTP_CODE=$(curl --fail -sS -o /dev/null -w "%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            --data "$PAYLOAD" "$DISCORD_WEBHOOK_URL" 2>/dev/null || echo "000")
+          if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ] 2>/dev/null; then
+            echo "⚠️ Discord notification FAILED (HTTP $HTTP_CODE). Webhook puede estar eliminado, sin permisos, o Discord caído."
+            {
+              echo "## 📣 Discord notification FAILED"
+              echo "- HTTP code: \`$HTTP_CODE\`"
+              echo "- Pipeline status: \`$STATUS\`"
+              echo "- [Abrir run](${RUN_URL})"
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "📣 Notificación enviada a Discord (HTTP $HTTP_CODE) — pipeline: ${STATUS}"
