@@ -685,6 +685,7 @@ jobs:
             --arg short_sha "$SHORT_SHA" \
             --arg author "$AUTHOR" \
             --arg event "$EVENT" \
+            --arg branch "$BRANCH" \
             --arg version "$VERSION_DISPLAY" \
             --arg tag "$TAG_DISPLAY" \
             --arg release_link "$ARTIFACT_LINK" \
