@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.blipblipcode.query"
     compileSdk {
-        version = release(36)
+        version = release(37)
     }
 
     defaultConfig {
@@ -75,8 +75,19 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.sqlite.ktx)
     testImplementation(libs.junit)
+    testImplementation(libs.r8)
+    testImplementation(libs.retrofit)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+}
+
+tasks.withType<Test>().configureEach {
+    // R8ObfuscationTest runs the real R8 with the rules the AAR publishes
+    systemProperty(
+        "query.consumerRules",
+        layout.projectDirectory.file("consumer-rules.pro").asFile.absolutePath
+    )
 }
 
 tasks.register("runQueryUnitTests") {

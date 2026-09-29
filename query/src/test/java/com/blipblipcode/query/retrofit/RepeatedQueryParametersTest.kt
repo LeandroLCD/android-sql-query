@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.lang.reflect.Modifier
+import java.lang.reflect.ParameterizedType
 
 class RepeatedQueryParametersTest {
 
@@ -340,6 +342,49 @@ class RepeatedQueryParametersTest {
         assertEquals("original", oldValue)
         assertEquals("modified", entry.value)
         assertEquals("original", params["key"]) // Original map should not be affected
+    }
+
+    @Test
+    fun `generic superclass preserves String keys under reflection`() {
+        // Given: The bytecode of this class, as R8 sees it when Signature is kept
+        val genericSuperclass = RepeatedQueryParameters::class.java.genericSuperclass
+
+        // When: Reading the type arguments bound by LinkedHashMap
+        // Then: They must be concrete types (String, Any), never type variables (K, V)
+        assertTrue(genericSuperclass is ParameterizedType)
+
+        val parameterizedType = genericSuperclass as ParameterizedType
+        assertEquals(LinkedHashMap::class.java, parameterizedType.rawType)
+        assertEquals(String::class.java, parameterizedType.actualTypeArguments[0])
+        assertEquals(Any::class.java, parameterizedType.actualTypeArguments[1])
+    }
+
+    @Test
+    fun `public no-arg constructor is invocable`() {
+        // Given: No preloaded data
+        // When: Instantiating the class through its public no-arg constructor
+        val params = RepeatedQueryParameters()
+
+        // Then: An empty instance is returned
+        assertTrue(params.isEmpty())
+        assertEquals(0, params.size)
+    }
+
+    @Test
+    fun `companion factory methods are static on the class`() {
+        // Given: The class as seen by Java consumers and reflective lookups
+        val type = RepeatedQueryParameters::class.java
+
+        // When: Looking up the factory methods directly on the class (not on Companion)
+        // Then: They exist as static methods, so they survive any Companion obfuscation
+        val pairArrayClass = java.lang.reflect.Array.newInstance(Pair::class.java, 0).javaClass
+        val create = type.getMethod("create", pairArrayClass)
+        val fromMap = type.getMethod("fromMap", Map::class.java)
+        val empty = type.getMethod("empty")
+
+        assertTrue(Modifier.isStatic(create.modifiers))
+        assertTrue(Modifier.isStatic(fromMap.modifiers))
+        assertTrue(Modifier.isStatic(empty.modifiers))
     }
 
 }
