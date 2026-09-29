@@ -338,6 +338,18 @@ Notas de uso y buenas prácticas:
 - Para agregar dinámicamente parámetros desde un `Queryable`, usa `asQueryRepeatedQueryParameters()` y opcionalmente provee un `predicate` para incluir/excluir pares.
 - Mantén simples los valores no list (String, Int, Boolean); las listas son las que generan repetición en la URL.
 
+### Ofuscación (R8 / ProGuard)
+
+La librería publica sus reglas de consumo en `consumer-rules.pro`, que el AAR empaqueta como `proguard.txt`. Si tu app tiene `minifyEnabled = true`, esas reglas se aplican automáticamente: **no necesitás agregar reglas propias para usar `RepeatedQueryParameters` con Retrofit**.
+
+Qué garantiza y por qué:
+- `-keepattributes Signature`: Retrofit valida el `@QueryMap` por reflexión (`getGenericSuperclass()`), leyendo la firma genérica `LinkedHashMap<String, Any>`. Si R8 la elimina, la llamada falla en runtime con `@QueryMap keys must be of type String: K`.
+- `-keep,allowobfuscation,allowshrinking`: la clase puede renombrarse y eliminarse si no se usa; lo que se conserva es su firma genérica y sus miembros públicos. Si tu código accede a la clase por reflexión (nombre de clase o de método), agregá tus propias reglas.
+
+Importante para el consumidor: si tu `proguard-rules.pro` deshabilita globalmente los atributos (por ejemplo con reglas del tipo que filtren `-keepattributes`), la validación de Retrofit vuelve a fallar. Verificá que `-keepattributes Signature` siga aplicándose en tu app.
+
+La cobertura de esta regla no es teórica: `R8ObfuscationTest` (en `query/src/test`) ejecuta el R8 real sobre la clase con las reglas publicadas y valida, tanto la firma genérica resultante como una llamada real a un servicio Retrofit de ejemplo.
+
 ---
 
 ## 📝 Ejemplos Avanzados

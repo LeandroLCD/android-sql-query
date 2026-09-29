@@ -16,10 +16,28 @@ package com.blipblipcode.query.retrofit
  * )
  * // Results in: ?terminal=2&tire_status=3&tire_status=4&category=active
  * ```
+ *
+ * ### R8 / ProGuard
+ *
+ * This class is safe to consume from an app with R8 enabled: the library ships
+ * `consumer-rules.pro`, which keeps the `Signature` attribute and the generic
+ * signature of the superclass (`LinkedHashMap<String, Any>`). Retrofit resolves
+ * that signature reflectively to validate `@QueryMap` keys, so dropping it would
+ * break the call with `@QueryMap keys must be of type String: K`.
+ *
+ * Consumers only need to make sure their own rules do not strip
+ * `-keepattributes Signature` globally.
  */
 class RepeatedQueryParameters private constructor(
     m: MutableMap<String, Any>
 ) : LinkedHashMap<String, Any>(m) {
+
+    /**
+     * Public no-arg constructor for interop with frameworks and reflection based
+     * consumers (binding libraries, deserialization) that require an empty
+     * instance to be instantiable. Prefer [create], [fromMap] or [empty].
+     */
+    constructor() : this(LinkedHashMap())
 
     companion object {
         /**
@@ -29,6 +47,7 @@ class RepeatedQueryParameters private constructor(
          *              - Single values (String, Int, Boolean, etc.)
          *              - Lists (will be expanded into multiple parameters)
          */
+        @JvmStatic
         fun create(vararg pairs: Pair<String, Any>): RepeatedQueryParameters {
             return RepeatedQueryParameters(linkedMapOf(*pairs))
         }
@@ -36,6 +55,7 @@ class RepeatedQueryParameters private constructor(
         /**
          * Creates a RepeatedQueryParameters instance from an existing map.
          */
+        @JvmStatic
         fun fromMap(map: MutableMap<String, Any>): RepeatedQueryParameters {
             return RepeatedQueryParameters(LinkedHashMap(map))
         }
@@ -43,6 +63,7 @@ class RepeatedQueryParameters private constructor(
         /**
          * Creates an empty RepeatedQueryParameters instance.
          */
+        @JvmStatic
         fun empty(): RepeatedQueryParameters {
             return RepeatedQueryParameters(LinkedHashMap())
         }
