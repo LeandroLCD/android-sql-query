@@ -2,6 +2,7 @@ package com.blipblipcode.query
 
 import com.blipblipcode.query.operator.Limit
 import com.blipblipcode.query.operator.LogicalOperation
+import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
 
@@ -419,6 +420,40 @@ class QuerySelect private constructor(
          */
         fun all(key: String, operator: SQLOperator<*>): QueryBuilder {
             operations[key] = LogicalOperation.All(operator)
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with AND.
+         *
+         * The group renders as `AND (<first> <second> ...)`, where each condition keeps its own
+         * connector. Combining it with `LogicalOperation.Or` entries builds
+         * `AND (a OR b OR c)` without the ORs escaping the preceding AND conditions.
+         *
+         * @param key A unique key for this condition.
+         * @param conditions The logical operations to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun andGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
+            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.AND.sql)
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with OR.
+         *
+         * The group renders as `OR (<first> <second> ...)`, where each condition keeps its own
+         * connector. Combining it with `LogicalOperation.And` entries builds
+         * `OR (a AND b AND c)` without the group leaking into the surrounding chain.
+         *
+         * @param key A unique key for this condition.
+         * @param conditions The logical operations to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun orGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
+            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.OR.sql)
             return this
         }
 

@@ -80,27 +80,61 @@ sealed interface LogicalOperation: Copyable<LogicalOperation> {
             return All(operator.clone())
         }
     }
-    @Suppress("UNCHECKED_CAST")
-    data class Multiple(val operations: List<LogicalOperation>, override val symbol: String = "AND") : LogicalOperation {
+    /**
+     * Groups several [LogicalOperation] into a single parenthesized unit so it can be appended to
+     * a WHERE clause without its inner connectors leaking into the surrounding chain.
+     *
+     * [symbol] defines how the group attaches to the enclosing clause, while every grouped
+     * operation keeps its own connector internally. For example,
+     * `Multiple(listOf(Or(a), Or(b)), LogicalType.AND.sql)` renders as `AND (a OR b)`, so the ORs
+     * cannot escape the preceding AND conditions the way a flat `joinToString(" ")` would allow.
+     *
+     * @property operations The grouped operations, at least one.
+     * @property symbol The connector used to attach the group to the enclosing clause.
+     * @throws IllegalArgumentException if [operations] is empty.
+     */
+    data class Multiple(
+        val operations: List<LogicalOperation>,
+        override val symbol: String = LogicalType.AND.sql
+    ) : LogicalOperation {
+
+        init {
+            require(operations.isNotEmpty()) { "A logical group requires at least one operation" }
+        }
+
         override val operator: SQLOperator<*>
             get() = operations.first().operator
+
+        /**
+         * Returns every operator contained in the group, in declaration order.
+         * @return The operators of the grouped operations.
+         */
+        fun operators(): List<SQLOperator<*>> = operations.map { it.operator }
 
         override fun asString(): String {
             return buildString {
                 append("$symbol (")
                 operations.forEachIndexed { index, logicalOperation ->
-                    if (index == 0) {
-                        append(logicalOperation.operator.asString())
-                    } else {
-                        append(" ${logicalOperation.asString()}")
+                    when {
+                        index == 0 && logicalOperation !is Multiple -> {
+                            append(logicalOperation.operator.toSQLString())
+                        }
+
+                        index > 0 -> {
+                            append(" ${logicalOperation.asString()}")
+                        }
+
+                        else -> {
+                            append(logicalOperation.asString())
+                        }
                     }
                 }
                 append(")")
-
             }
         }
+
         override fun clone(): LogicalOperation {
-            return Multiple(operations.map { it.clone() }, symbol =  symbol)
+            return Multiple(operations.map { it.clone() }, symbol = symbol)
         }
     }
 
