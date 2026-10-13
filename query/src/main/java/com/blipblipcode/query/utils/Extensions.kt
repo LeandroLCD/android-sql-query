@@ -136,16 +136,33 @@ fun LogicalOperation.copyOperation(operator: SQLOperator<*> = this.operator): Lo
         is AndNot -> AndNot(operator = operator)
         is Exists -> Exists(operator = operator)
         is Multiple -> {
-            val updatedOperations = operations.toMutableList()
-            if (updatedOperations.isNotEmpty()) {
-                updatedOperations[0] = updatedOperations[0].copyOperation(operator)
-            }
-            Multiple(updatedOperations, symbol)
+            Multiple(replaceFirstLeafOperator(operations, operator), symbol)
         }
         is Not -> Not(operator = operator)
         is Or -> Or(operator = operator)
         is Where -> Where(operator = operator)
     }
+}
+
+/**
+ * Replaces the operator of the first non grouped condition, keeping every connector intact.
+ *
+ * Replacing the first *element* of a group would nest a group inside a group and emit an invalid
+ * connector such as `AND (OR (a OR b))`, so the replacement walks into nested groups instead.
+ *
+ * @param operations The conditions of the group being copied.
+ * @param operator The `SQLOperator` that replaces the first condition.
+ * @return A new list with the replacement applied.
+ */
+private fun replaceFirstLeafOperator(
+    operations: List<LogicalOperation>,
+    operator: SQLOperator<*>
+): List<LogicalOperation> {
+    val index = operations.indexOfFirst { it !is Multiple }
+    if (index == -1) return operations
+    val updated = operations.toMutableList()
+    updated[index] = updated[index].copyOperation(operator)
+    return updated
 }
 
 /**

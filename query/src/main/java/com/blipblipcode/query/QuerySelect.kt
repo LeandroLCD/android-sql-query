@@ -5,6 +5,7 @@ import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.OrderBy
 import com.blipblipcode.query.operator.SQLOperator
+import com.blipblipcode.query.operator.logicalGroup
 
 /**
  * Represents a SQL SELECT statement.
@@ -116,6 +117,58 @@ class QuerySelect private constructor(
     }
 
     /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with AND.
+     * @param key A unique key for this condition.
+     * @param conditions The logical operations to group, at least one.
+     * @return The current `QuerySelect` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun andGroup(key: String, vararg conditions: LogicalOperation): QuerySelect {
+        operations[key] = logicalGroup(LogicalType.AND, conditions.toList())
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with AND, linking the
+     * conditions inside the group with [connector].
+     * @param key A unique key for this condition.
+     * @param connector The connector used between the conditions inside the group.
+     * @param conditions The conditions to group, at least one.
+     * @return The current `QuerySelect` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun andGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QuerySelect {
+        operations[key] = logicalGroup(LogicalType.AND, connector, conditions)
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with OR.
+     * @param key A unique key for this condition.
+     * @param conditions The logical operations to group, at least one.
+     * @return The current `QuerySelect` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun orGroup(key: String, vararg conditions: LogicalOperation): QuerySelect {
+        operations[key] = logicalGroup(LogicalType.OR, conditions.toList())
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with OR, linking the
+     * conditions inside the group with [connector].
+     * @param key A unique key for this condition.
+     * @param connector The connector used between the conditions inside the group.
+     * @param conditions The conditions to group, at least one.
+     * @return The current `QuerySelect` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun orGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QuerySelect {
+        operations[key] = logicalGroup(LogicalType.OR, connector, conditions)
+        return this
+    }
+
+    /**
      * Returns a new `QuerySelect` instance with the specified fields.
      * @param newFields The names of the columns to select. If empty, selects all columns ("*").
      * @return A new `QuerySelect` instance with the updated fields.
@@ -136,15 +189,15 @@ class QuerySelect private constructor(
 
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
-            where?.let { add(it.second.operator) }
-            operations.values.forEach { add(it.operator) }
+            where?.let { addAll(it.second.sqlOperators()) }
+            operations.values.forEach { addAll(it.sqlOperators()) }
             orderBy?.let { add(it) }
             limit?.let { add(it) }
         }
     }
 
     fun getOperators(): List<SQLOperator<*>> {
-        return operations.values.map { it.operator }
+        return operations.values.flatMap { it.sqlOperators() }
     }
 
     fun getOperations(): Map<String, SQLOperator<*>> {
@@ -176,7 +229,7 @@ class QuerySelect private constructor(
             if (where == null) {
                 append("SELECT $fieldStr FROM $table")
             } else {
-                append("SELECT $fieldStr FROM $table ${where?.second?.asString()} $operationsStr".trim())
+                append("SELECT $fieldStr FROM $table ${where?.second?.asWhereString()} $operationsStr".trim())
             }
             if (orderBy != null) {
                 append(" ")
@@ -191,20 +244,28 @@ class QuerySelect private constructor(
 
     /**
      * Generates the SQL string for the SELECT statement.
+     *
+     * The predicate descends into grouped conditions, so a group keeps the conditions the predicate
+     * accepts instead of being dropped as a whole. When the WHERE clause does not survive the
+     * filter, the first surviving condition is promoted to the WHERE position so the statement
+     * never starts with a dangling connector.
+     *
      * @param predicate The predicate to filter the operators.
      * @return The complete SELECT SQL query as a string.
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         val fieldStr = if (fields.isEmpty()) "*" else fields.joinToString(", ")
-        val filteredWhere = where?.takeIf { predicate(it.second.operator) }
-        val operationsStr =
-            if (operations.isNotEmpty()) operations.values.filter { predicate(it.operator) }
-                .joinToString(" ") { it.asString() } else ""
+        val anchor = where?.second?.filterBy(predicate)
+        val retained = operations.values.mapNotNull { it.filterBy(predicate) }
+        val whereClause = anchor ?: retained.firstOrNull()
+        val trailing = if (anchor != null) retained else retained.drop(1)
         return buildString {
-            if (filteredWhere == null) {
+            if (whereClause == null) {
                 append("SELECT $fieldStr FROM $table")
             } else {
-                append("SELECT $fieldStr FROM $table ${filteredWhere.second.asString()} $operationsStr".trim())
+                append(
+                    "SELECT $fieldStr FROM $table ${whereClause.asWhereString()} ${trailing.joinToString(" ") { it.asString() }}".trim()
+                )
             }
             orderBy?.takeIf { predicate(it) }?.let {
                 append(" ")
@@ -278,7 +339,7 @@ class QuerySelect private constructor(
         require(where != null) { "QuerySelect must have a WHERE clause to be converted to QueryDelete" }
 
         val deleteQuery = QueryDelete.builder(getTableName())
-            .where(where!!.second.operator)
+            .where(where!!.first, where!!.second)
             .build()
 
         operations.forEach { (key, operation) ->
@@ -436,7 +497,26 @@ class QuerySelect private constructor(
          * @throws IllegalArgumentException if [conditions] is empty.
          */
         fun andGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
-            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.AND.sql)
+            operations[key] = logicalGroup(LogicalType.AND, conditions.toList())
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with AND, linking
+         * the conditions inside the group with [connector].
+         *
+         * This is the shortcut for the common "apply every filter but let the term match any of
+         * these columns" shape: `andGroup("search", LogicalType.OR, like1, like2)` renders
+         * `AND (like1 OR like2)` without spelling out a `LogicalOperation.Or` per condition.
+         *
+         * @param key A unique key for this condition.
+         * @param connector The connector used between the conditions inside the group.
+         * @param conditions The conditions to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun andGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryBuilder {
+            operations[key] = logicalGroup(LogicalType.AND, connector, conditions)
             return this
         }
 
@@ -453,7 +533,22 @@ class QuerySelect private constructor(
          * @throws IllegalArgumentException if [conditions] is empty.
          */
         fun orGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
-            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.OR.sql)
+            operations[key] = logicalGroup(LogicalType.OR, conditions.toList())
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with OR, linking
+         * the conditions inside the group with [connector].
+         *
+         * @param key A unique key for this condition.
+         * @param connector The connector used between the conditions inside the group.
+         * @param conditions The conditions to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun orGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryBuilder {
+            operations[key] = logicalGroup(LogicalType.OR, connector, conditions)
             return this
         }
 

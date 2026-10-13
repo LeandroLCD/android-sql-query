@@ -429,24 +429,67 @@ val query = QuerySelect.builder("users")
 // SELECT * FROM users WHERE status = 'active' OR (role = 'admin' AND role = 'root')
 ```
 
-Los grupos también funcionan en `QueryDelete` y se pueden anidar entre sí. Para inspeccionar o
-transformar un grupo usá `Multiple.operators()`, que devuelve todos los operadores del grupo en
-orden; `getSqlOperators()` y `getOperations()` siguen devolviendo solo el primero para no romper la
-compatibilidad.
+Cuando todas las condiciones internas comparten el mismo conector, usá la sobrecarga con
+`LogicalType` y evitás envolver cada una en `LogicalOperation`:
+
+```kotlin
+// andGroup("search", LogicalType.OR, like1, like2)  ->  AND (like1 OR like2)
+val query = QuerySelect.builder("users")
+    .where(SQLOperator.Equals("status", "active"))
+    .andGroup(
+        "search",
+        LogicalType.OR,
+        SQLOperator.Like("doc_number", "cal"),
+        SQLOperator.Like("terminal_dest_display", "cal")
+    )
+    .build()
+
+// SELECT * FROM users WHERE status = 'active'
+//   AND (doc_number LIKE '%cal%' OR terminal_dest_display LIKE '%cal%')
+```
+
+Un grupo también puede ocupar la posición de `WHERE`, en cuyo caso se emite sin su conector:
+
+```kotlin
+QuerySelect.builder("users")
+    .where(
+        "search",
+        LogicalOperation.Multiple(
+            LogicalOperation.Or(SQLOperator.Equals("role", "admin")),
+            LogicalOperation.Or(SQLOperator.Equals("role", "root"))
+        )
+    )
+    .and("status", SQLOperator.Equals("status", "active"))
+    .build()
+
+// SELECT * FROM users WHERE (role = 'admin' OR role = 'root') AND status = 'active'
+```
+
+Los grupos funcionan en `QueryDelete`, se pueden anidar entre sí y se pueden agregar sobre una query
+ya construida con los mismos métodos. Para inspeccionar o transformar un grupo usá
+`Multiple.operators()`, que devuelve todos los operadores del grupo —incluidos los de grupos
+anidados— en orden.
 
 ```kotlin
 val query = QueryDelete.builder("sessions")
     .where(SQLOperator.LessThan("expires_at", now))
     .andGroup(
         "stale",
-        LogicalOperation.Or(SQLOperator.IsNull("refreshed_at")),
-        LogicalOperation.Or(SQLOperator.LessThan("refreshed_at", threshold))
+        LogicalType.OR,
+        SQLOperator.IsNull("refreshed_at"),
+        SQLOperator.LessThan("refreshed_at", threshold)
     )
     .build()
 
 // DELETE FROM sessions WHERE expires_at < 1700000000
 //   AND (refreshed_at IS NULL OR refreshed_at < 1600000000)
 ```
+
+`asSql(predicate)` **entra dentro de los grupos**: conserva las condiciones que el predicado acepta
+y descarta solo las que rechaza. Si ninguna sobrevive, el grupo desaparece; si el `WHERE` no
+sobrevive, la primera condición restante asciende a la posición de `WHERE` para que la sentencia
+nunca empiece con un conector colgante. `getSqlOperators()` (y por lo tanto
+`asQueryRepeatedQueryParameters()`) devuelve todos los operadores del grupo, no solo el primero.
 
 ---
 

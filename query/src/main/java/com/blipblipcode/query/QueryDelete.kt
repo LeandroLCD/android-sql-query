@@ -3,6 +3,7 @@ package com.blipblipcode.query
 import com.blipblipcode.query.operator.LogicalOperation
 import com.blipblipcode.query.operator.LogicalType
 import com.blipblipcode.query.operator.SQLOperator
+import com.blipblipcode.query.operator.logicalGroup
 
 /**
  * Represents a SQL DELETE statement.
@@ -69,11 +70,63 @@ class QueryDelete private constructor(
         return this
     }
 
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with AND.
+     * @param key A unique key for this condition.
+     * @param conditions The logical operations to group, at least one.
+     * @return The current `QueryDelete` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun andGroup(key: String, vararg conditions: LogicalOperation): QueryDelete {
+        operations[key] = logicalGroup(LogicalType.AND, conditions.toList())
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with AND, linking the
+     * conditions inside the group with [connector].
+     * @param key A unique key for this condition.
+     * @param connector The connector used between the conditions inside the group.
+     * @param conditions The conditions to group, at least one.
+     * @return The current `QueryDelete` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun andGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryDelete {
+        operations[key] = logicalGroup(LogicalType.AND, connector, conditions)
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with OR.
+     * @param key A unique key for this condition.
+     * @param conditions The logical operations to group, at least one.
+     * @return The current `QueryDelete` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun orGroup(key: String, vararg conditions: LogicalOperation): QueryDelete {
+        operations[key] = logicalGroup(LogicalType.OR, conditions.toList())
+        return this
+    }
+
+    /**
+     * Adds a parenthesized group of conditions attached to the WHERE clause with OR, linking the
+     * conditions inside the group with [connector].
+     * @param key A unique key for this condition.
+     * @param connector The connector used between the conditions inside the group.
+     * @param conditions The conditions to group, at least one.
+     * @return The current `QueryDelete` instance for chaining.
+     * @throws IllegalArgumentException if [conditions] is empty.
+     */
+    fun orGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryDelete {
+        operations[key] = logicalGroup(LogicalType.OR, connector, conditions)
+        return this
+    }
+
     override fun getSqlOperators(): List<SQLOperator<*>> {
         return buildList {
             require(where != null) { "A WHERE clause must be specified." }
-            add(where!!.second.operator)
-            operations.values.forEach { add(it.operator) }
+            addAll(where!!.second.sqlOperators())
+            operations.values.forEach { addAll(it.sqlOperators()) }
         }
     }
 
@@ -92,18 +145,28 @@ class QueryDelete private constructor(
      */
     override fun asSql(): String {
         require(where != null) { "A WHERE clause must be specified." }
-        return "DELETE FROM $table ${where!!.second.asString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
+        return "DELETE FROM $table ${where!!.second.asWhereString()} ${operations.values.joinToString(" ") { it.asString() }}".trim()
     }
 
     /**
      * Generates the SQL string for the DELETE statement.
+     *
+     * The predicate descends into grouped conditions, so a group keeps the conditions the predicate
+     * accepts instead of being dropped as a whole. When the WHERE clause does not survive the
+     * filter, the first surviving condition is promoted to the WHERE position so the statement
+     * never starts with a dangling connector.
+     *
      * @param predicate The predicate to filter the operators.
      * @return The complete DELETE SQL query as a string.
      * @throws IllegalArgumentException if the WHERE clause is not set.
      */
     override fun asSql(predicate: (SQLOperator<*>) -> Boolean): String {
         require(where != null) { "A WHERE clause must be specified." }
-        return "DELETE FROM $table ${where!!.second.asString()} ${operations.values.filter { predicate(it.operator) }.joinToString(" ") { it.asString() }}".trim()
+        val anchor = where!!.second.filterBy(predicate)
+        val retained = operations.values.mapNotNull { it.filterBy(predicate) }
+        val whereClause = anchor ?: retained.firstOrNull() ?: return "DELETE FROM $table"
+        val trailing = if (anchor != null) retained else retained.drop(1)
+        return "DELETE FROM $table ${whereClause.asWhereString()} ${trailing.joinToString(" ") { it.asString() }}".trim()
     }
 
     /**
@@ -221,7 +284,22 @@ class QueryDelete private constructor(
          * @throws IllegalArgumentException if [conditions] is empty.
          */
         fun andGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
-            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.AND.sql)
+            operations[key] = logicalGroup(LogicalType.AND, conditions.toList())
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with AND, linking
+         * the conditions inside the group with [connector].
+         *
+         * @param key A unique key for this condition.
+         * @param connector The connector used between the conditions inside the group.
+         * @param conditions The conditions to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun andGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryBuilder {
+            operations[key] = logicalGroup(LogicalType.AND, connector, conditions)
             return this
         }
 
@@ -238,7 +316,22 @@ class QueryDelete private constructor(
          * @throws IllegalArgumentException if [conditions] is empty.
          */
         fun orGroup(key: String, vararg conditions: LogicalOperation): QueryBuilder {
-            operations[key] = LogicalOperation.Multiple(conditions.toList(), LogicalType.OR.sql)
+            operations[key] = logicalGroup(LogicalType.OR, conditions.toList())
+            return this
+        }
+
+        /**
+         * Adds a parenthesized group of conditions attached to the WHERE clause with OR, linking
+         * the conditions inside the group with [connector].
+         *
+         * @param key A unique key for this condition.
+         * @param connector The connector used between the conditions inside the group.
+         * @param conditions The conditions to group, at least one.
+         * @return The `QueryBuilder` instance for chaining.
+         * @throws IllegalArgumentException if [conditions] is empty.
+         */
+        fun orGroup(key: String, connector: LogicalType, vararg conditions: SQLOperator<*>): QueryBuilder {
+            operations[key] = logicalGroup(LogicalType.OR, connector, conditions)
             return this
         }
 
@@ -259,6 +352,19 @@ class QueryDelete private constructor(
          */
         fun where(operator: SQLOperator<*>): QueryBuilder {
             where = operator.column to LogicalOperation.Where(operator)
+            return this
+        }
+
+        /**
+         * Sets the main WHERE clause from an already built logical operation, preserving it as is.
+         * Use this overload to carry over a grouped clause without unwrapping it into its first
+         * operator.
+         * @param key The key the clause is registered under.
+         * @param operation The logical operation to use as the WHERE clause.
+         * @return The `QueryBuilder` instance for chaining.
+         */
+        fun where(key: String, operation: LogicalOperation): QueryBuilder {
+            where = key to operation
             return this
         }
 
