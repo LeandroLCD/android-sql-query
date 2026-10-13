@@ -38,6 +38,7 @@ Diseñada para integrarse perfectamente con la base de datos de Android y Room a
 - [🔗 Integración con Room](#-integración-con-room)
 - [📡 Integración con retrofit -> RepeatedQueryParameters](#-repeatedqueryparameters)
 - [📝 Ejemplos Avanzados](#-ejemplos-avanzados)
+  - [Agrupación de condiciones AND / OR](#-agrupación-de-condiciones-and--or)
 - [🤝 Contribuir](#-contribuir)
 
 ---
@@ -49,6 +50,7 @@ Diseñada para integrarse perfectamente con la base de datos de Android y Room a
 - 🔄 **Joins Complejos**: Soporte para `INNER JOIN`
 - ⚡ **Operadores SQL**: Amplia gama de operadores (`=`, `!=`, `>`, `<`, `LIKE`, `IN`, `BETWEEN`, `IS NULL`, etc.)
 - 🧩 **Condiciones Lógicas**: Combina cláusulas fácilmente con `AND` y `OR`
+- 🔒 **Agrupación de Condiciones**: Encapsula condiciones en grupos `AND (...)` / `OR (...)` para evitar fugas de precedencia
 - 🏛️ **Integración con Room**: Conversión directa a `SupportSQLiteQuery` con la función de extensión `asSQLiteQuery()`
 - 💯 **100% Kotlin**: Código moderno, idiomático y nulo-seguro
 
@@ -375,6 +377,119 @@ val bulkUpdate = QueryUpdate.builder("inventory")
     .where(SQLOperator.LessThan("stock", 5))
     .build()
 ```
+
+### Agrupación de condiciones AND / OR
+
+Las condiciones se encadenan en un solo nivel. Por eso un `OR` agregado al final **no** queda
+ligado al `AND` anterior: en SQL `AND` tiene mayor precedencia que `OR`, así que
+
+```kotlin
+// ⛔ NO hagas esto: el AND se interpreta como (creator = 1 AND status = 1) OR (...)
+val broken = QuerySelect.builder("tire_transfer_document")
+    .where(SQLOperator.Equals("creator", 1))
+    .and("status", SQLOperator.Equals("status", 1))
+    .or("doc_number", SQLOperator.Like("doc_number", "cal"))
+    .or("terminal_dest_display", SQLOperator.Like("terminal_dest_display", "cal"))
+    .build()
+```
+
+Para expresses esa intención usá `andGroup` / `orGroup`. Cada condición del grupo conserva su propio
+conector, y el símbolo del grupo define **cómo se conecta** el grupo a la cadena:
+
+```kotlin
+val query = QuerySelect.builder("tire_transfer_document")
+    .where(SQLOperator.Equals("creator", 1))
+    .and("status", SQLOperator.Equals("status", 1))
+    .andGroup(
+        "search",
+        LogicalOperation.Or(SQLOperator.Like("doc_number", "cal", CaseConversion.LOWER)),
+        LogicalOperation.Or(SQLOperator.Like("terminal_source_display", "cal", CaseConversion.LOWER)),
+        LogicalOperation.Or(SQLOperator.Like("terminal_dest_display", "cal", CaseConversion.LOWER))
+    )
+    .build()
+
+// SELECT * FROM tire_transfer_document WHERE creator = 1 AND status = 1
+//   AND (LOWER(doc_number) LIKE LOWER('%cal%')
+//        OR LOWER(terminal_source_display) LIKE LOWER('%cal%')
+//        OR LOWER(terminal_dest_display) LIKE LOWER('%cal%'))
+```
+
+`orGroup` hace lo inverso: conecta el grupo con `OR` a la cadena.
+
+```kotlin
+val query = QuerySelect.builder("users")
+    .where(SQLOperator.Equals("status", "active"))
+    .orGroup(
+        "role",
+        LogicalOperation.And(SQLOperator.Equals("role", "admin")),
+        LogicalOperation.And(SQLOperator.Equals("role", "root"))
+    )
+    .build()
+
+// SELECT * FROM users WHERE status = 'active' OR (role = 'admin' AND role = 'root')
+```
+
+Cuando todas las condiciones internas comparten el mismo conector, usá la sobrecarga con
+`LogicalType` y evitás envolver cada una en `LogicalOperation`:
+
+```kotlin
+// andGroup("search", LogicalType.OR, like1, like2)  ->  AND (like1 OR like2)
+val query = QuerySelect.builder("users")
+    .where(SQLOperator.Equals("status", "active"))
+    .andGroup(
+        "search",
+        LogicalType.OR,
+        SQLOperator.Like("doc_number", "cal"),
+        SQLOperator.Like("terminal_dest_display", "cal")
+    )
+    .build()
+
+// SELECT * FROM users WHERE status = 'active'
+//   AND (doc_number LIKE '%cal%' OR terminal_dest_display LIKE '%cal%')
+```
+
+Un grupo también puede ocupar la posición de `WHERE`, en cuyo caso se emite sin su conector:
+
+```kotlin
+QuerySelect.builder("users")
+    .where(
+        "search",
+        LogicalOperation.Multiple(
+            LogicalOperation.Or(SQLOperator.Equals("role", "admin")),
+            LogicalOperation.Or(SQLOperator.Equals("role", "root"))
+        )
+    )
+    .and("status", SQLOperator.Equals("status", "active"))
+    .build()
+
+// SELECT * FROM users WHERE (role = 'admin' OR role = 'root') AND status = 'active'
+```
+
+Los grupos funcionan en `QueryDelete`, se pueden anidar entre sí y se pueden agregar sobre una query
+ya construida con los mismos métodos. Para inspeccionar o transformar un grupo usá
+`Multiple.operators()`, que devuelve todos los operadores del grupo —incluidos los de grupos
+anidados— en orden.
+
+```kotlin
+val query = QueryDelete.builder("sessions")
+    .where(SQLOperator.LessThan("expires_at", now))
+    .andGroup(
+        "stale",
+        LogicalType.OR,
+        SQLOperator.IsNull("refreshed_at"),
+        SQLOperator.LessThan("refreshed_at", threshold)
+    )
+    .build()
+
+// DELETE FROM sessions WHERE expires_at < 1700000000
+//   AND (refreshed_at IS NULL OR refreshed_at < 1600000000)
+```
+
+`asSql(predicate)` **entra dentro de los grupos**: conserva las condiciones que el predicado acepta
+y descarta solo las que rechaza. Si ninguna sobrevive, el grupo desaparece; si el `WHERE` no
+sobrevive, la primera condición restante asciende a la posición de `WHERE` para que la sentencia
+nunca empiece con un conector colgante. `getSqlOperators()` (y por lo tanto
+`asQueryRepeatedQueryParameters()`) devuelve todos los operadores del grupo, no solo el primero.
 
 ---
 
